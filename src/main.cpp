@@ -3,8 +3,7 @@
 // Ver referencia de la API aquí:
 // ver: https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/
 //
-// Para ver las variables predefinidas en GLSL, ver aquí:
-// https://www.khronos.org/opengl/wiki/Built-in_Variable_(GLSL)
+
 
 #include <cstring>  // para 'strlen' (al compilar shaders)
 #include <iostream> 
@@ -13,12 +12,15 @@
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
 #include <GLFW/glfw3.h>  
+
+#define glGenVertexArrays  glGenVertexArraysAPPLE
+#define glBindVertexArray  glBindVertexArrayAPPLE
 #else 
 #pragma error "no está definido MACOS ...."
 #endif
 
 
-
+// ---------------------------------------------------------------------------------------------
 // Variables globales 
 
 bool 
@@ -27,74 +29,124 @@ bool
 GLFWwindow *                      
     ventana_glfw        = nullptr; // puntero a la ventana GLFW
 int 
-    ancho_actual        = 512 ,      // ancho actual de la ventana
-    alto_actual         = 512 ;      // alto actual de la ventana
+    ancho_actual        = 512 ,      // ancho actual del framebuffer, en pixels
+    alto_actual         = 512 ;      // alto actual del framebuffer, en pixels
 
 GLint 
     loc_matriz_transf_coords  ;
 
-// fuente para el vertex shader sencillo
-const char * const fuente_vs = 
-    R"glsl(
-        #version 120
-        uniform mat4 matriz_transf_coords; 
-        void main() 
-        {
-            gl_FrontColor = gl_Color ; 
-            gl_Position   = matriz_transf_coords *  gl_Vertex;     
-        }
-    )glsl";
+GLenum 
+    id_vao = 0 ; // identificador de VAO (vertex array object)
 
-// fuente para el fragment shader sencillo
-const char * const fuente_fs = 
-    R"glsl(
-        #version 120
-        void main() 
-        {
-            gl_FragColor = gl_Color ; // color interpolado
-        }
-    )glsl";
+// ---------------------------------------------------------------------------------------------
+// Fuentes para el vertex shader y el fragment shader 
 
+// fuente para el vertex shader sencillo, se invoca una vez por cada vértice. 
+// su función es escribir en 'gl_Position' las coordenadas del vértice 
+// además, puede escribir otros atributos del vértice en variables 'varying'
+// (en este caso escribe el color en 'v_color')
 
-// Funciones 
+const char * const fuente_vs = R"glsl(
+    #version 120
+    
+    uniform mat4 u_matriz_transf_coords; // variable uniform: matriz de transformación de coordenadas
+    varying vec4 v_color ; // variable de salida: color del vértice
+
+    void main() 
+    {
+        v_color     = gl_Color ; // el color del vértice es el enviado por la aplicación.
+        gl_Position = u_matriz_transf_coords *  gl_Vertex;  // transforma coordenadas   
+    }
+)glsl";
+
+// fuente para el fragment shader sencillo: se invoca una vez por cada pixel.
+// su función es escribir en 'gl_FragColor' el color del pixel 
+
+const char * const fuente_fs = R"glsl(
+    #version 120
+    
+    varying vec4 v_color ; // variable de entrada: color interpolado.
+    
+    void main() 
+    {
+        gl_FragColor = v_color ; // el color del pixel es el color interpolado
+    }
+)glsl";
+
+// ---------------------------------------------------------------------------------------------
+// función que se encarga de visualizar el contenido en la ventana
 
 void VisualizarFrame( ) 
 { 
-    static int cuenta = 0 ;
     using namespace std ;
-    cout << "VisualizarFrame, cuenta == " << ++cuenta << endl ;
-
-    assert( glGetError() == GL_NO_ERROR );
-
-    glViewport( 0, 0, ancho_actual, alto_actual ); // establecer zona visible
-    glClearColor( 1.0, 1.0, 1.0, 0.0 ); // color para 'glClear' (blanco, 100% opaco)
-    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT ); // limpiar la ventana
-
-    assert( glGetError() == GL_NO_ERROR );
-
     
-    glBegin( GL_LINES );
-        glColor4f( 1.0, 0.1, 0.1, 1.0 ); glVertex3f( 0.0, 0.0, 0.0 );
-        glColor4f( 0.0, 1.0, 0.1, 1.0 ); glVertex3f( 1.0, 1.0, 0.0 );
-    glEnd() ; 
+    assert( glGetError() == GL_NO_ERROR );
+
+    // establece la zona visible (toda la ventana)
+    glViewport( 0, 0, ancho_actual, alto_actual ); 
+    
+    // limpiar la ventana
+    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT ); 
 
     assert( glGetError() == GL_NO_ERROR );
 
+    // número de vértices que se van a dibujar
+    constexpr unsigned
+        num_verts = 3 ;
+
+    if ( id_vao == 0 )
+    {
+        // tablas de coordenadas y colores de vértices (coordenadas en 2D, con Z=0) 
+        const GLfloat 
+            coordenadas[ num_verts*2 ] = {  -0.8, -0.8,      +0.8, -0.8,     0.0, 0.8      },
+            colores    [ num_verts*3 ] = {  1.0, 0.0, 0.0,   0.0, 1.0, 0.0,  0.0, 0.0, 1.0 } ;
+        
+        // crear y activar el VAO
+        glGenVertexArrays( 1, &id_vao ); // crear VAO
+        glBindVertexArray( id_vao );     // activa VAO
+
+        // crear el VBO de coordenadas, y fijar puntero a la tabla de coordenadas
+        GLenum  id_vbo_coordenadas ;
+        glGenBuffers( 1, &id_vbo_coordenadas );               // crea VBO verts.
+        glBindBuffer( GL_ARRAY_BUFFER, id_vbo_coordenadas );  // activa VBO verts.                            
+        glBufferData( GL_ARRAY_BUFFER, 2*num_verts*sizeof(float), coordenadas, GL_STATIC_DRAW ); // copia
+        glVertexPointer( 2, GL_FLOAT, 0, 0 );  // indica puntero a array de coordenadas
+        glEnableClientState( GL_VERTEX_ARRAY ); // habilita uso de array de coordenadas
+
+        // crear el VBO de colores, y fijar puntero a la tabla de colores
+        GLenum id_vbo_colores  ;
+        glGenBuffers( 1, &id_vbo_colores );  // crea VBO colores
+        glBindBuffer( GL_ARRAY_BUFFER, id_vbo_colores );   // activa VBO colores                           
+        glBufferData( GL_ARRAY_BUFFER, 3*num_verts*sizeof(float), colores, GL_STATIC_DRAW ); // copia
+        glColorPointer( 3, GL_FLOAT, 0, 0 );    // indica puntero a array de colores
+        glEnableClientState( GL_COLOR_ARRAY );  // habilita uso de array de colores
+    }
+    else
+        glBindVertexArray( id_vao );
+
+    // dibujar y desactivar el VAO
+    glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+    glShadeModel( GL_SMOOTH );
+    glDrawArrays( GL_POLYGON, 0, num_verts );
+    glBindVertexArray( 0 );
+
+    assert( glGetError() == GL_NO_ERROR );
+
+    // esperar a que termine 'glDrawArrays' y entonces presentar el framebuffer actualizado
     glfwSwapBuffers( ventana_glfw );
     
 }
 // ---------------------------------------------------------------------------------------------
+// función que se invoca cada vez que cambia el número de pixels del framebuffer 
 
 void FGE_CambioTamano( GLFWwindow* ventana, int nuevo_ancho, int nuevo_alto )
 { 
     ancho_actual      = nuevo_ancho ;
     alto_actual       = nuevo_alto ;
     redibujar_ventana = true ; // fuerza a redibujar la ventana
-
-    using namespace std ;
-    cout << "Nuevas dimensiones del viewport == " << nuevo_ancho << " x " << nuevo_alto << endl ;
 }
 // ---------------------------------------------------------------------------------------------
+// función que se invocará cada vez que se pulse o levante una tecla. 
 
 void FGE_PulsarLevantarTecla( GLFWwindow* ventana, int key, int scancode, int action, int mods ) 
 { 
@@ -103,23 +155,29 @@ void FGE_PulsarLevantarTecla( GLFWwindow* ventana, int key, int scancode, int ac
         terminar_programa = true ;
 }
 // ---------------------------------------------------------------------------------------------
+// función que se invocará cada vez que se pulse o levante un botón del ratón
 
 void FGE_PulsarLevantarBotonRaton( GLFWwindow* ventana, int button, int action, int mods ) 
 { 
     // nada, por ahora 
     
 }
+// ---------------------------------------------------------------------------------------------
+// función que se invocará cada vez que cambie la posición del puntero
+
 void FGE_MovimientoRaton( GLFWwindow* ventana, double xpos, double ypos )
 {
     // nada, por ahora 
 }
 // ---------------------------------------------------------------------------------------------
+// función que se invocará cada vez que mueva la rueda del ratón.
 
 void FGE_Scroll( GLFWwindow* ventana, double xoffset, double yoffset ) 
 {
     // nada, por ahora 
 }
 // ---------------------------------------------------------------------------------------------
+// función que se invocará cuando se produzca un error de GLFW 
 
 void ErrorGLFW ( int error, const char * description )
 {
@@ -131,8 +189,9 @@ void ErrorGLFW ( int error, const char * description )
     exit(1);
 }
 // ---------------------------------------------------------------------------------------------
+// código de inicialización de GLFW 
 
-void Inicializa_GLFW( int argc, char * argv[] ) 
+void InicializaGLFW( int argc, char * argv[] ) 
 { 
     using namespace std ;
 
@@ -147,23 +206,46 @@ void Inicializa_GLFW( int argc, char * argv[] )
     glfwSetErrorCallback( ErrorGLFW );
     
     // crear la ventana (var. global ventana_glfw), activar el rendering context 
-    ventana_glfw = glfwCreateWindow( ancho_actual, alto_actual, "IG ejemplo mínimo", nullptr, nullptr ); 
+    ventana_glfw = glfwCreateWindow( 512, 512, "IG ejemplo mínimo", nullptr, nullptr ); 
     glfwMakeContextCurrent( ventana_glfw ); // necesario para OpenGL
 
+    // leer y guardar las dimensiones del framebuffer en pixels
+    glfwGetFramebufferSize( ventana_glfw, &ancho_actual, &alto_actual );
+
     // definir cuales son las funciones gestoras de eventos (con nombres 'FGE_....')
-    glfwSetWindowSizeCallback ( ventana_glfw, FGE_CambioTamano );
-    glfwSetKeyCallback        ( ventana_glfw, FGE_PulsarLevantarTecla );
-    glfwSetMouseButtonCallback( ventana_glfw, FGE_PulsarLevantarBotonRaton);
-    glfwSetCursorPosCallback  ( ventana_glfw, FGE_MovimientoRaton );
-    glfwSetScrollCallback     ( ventana_glfw, FGE_Scroll );
+    glfwSetFramebufferSizeCallback( ventana_glfw, FGE_CambioTamano );
+    glfwSetKeyCallback            ( ventana_glfw, FGE_PulsarLevantarTecla );
+    glfwSetMouseButtonCallback    ( ventana_glfw, FGE_PulsarLevantarBotonRaton);
+    glfwSetCursorPosCallback      ( ventana_glfw, FGE_MovimientoRaton );
+    glfwSetScrollCallback         ( ventana_glfw, FGE_Scroll );
+}
+
+// ---------------------------------------------------------------------------------------------
+// función para inicializar GLEW (necesario para las funciones de OpenGL ver 2.0 y posteriores)
+// en macOS no es necesario (está vacía)
+
+void InicializaGLEW()
+{
+#ifndef MACOS
+    GLenum codigoError = glewInit();
+    if ( codigoError != GLEW_OK ) // comprobar posibles errores
+    {
+        cout << "Imposible inicializar ’GLEW’, mensaje recibido: " << endl 
+             < (const char *)glewGetErrorString(codigoError) << endl ;
+        exit(1);
+    }
+    else
+        cout << "Librería GLEW inicializada correctamente." << endl << flush ;
+
+#endif
 }
 // ---------------------------------------------------------------------------------------------
+// función que compila el vertex y el fragment shader
 
-void Compilar_Shaders( ) 
+void CompilarShaders( ) 
 { 
-    using namespace std ;
-
     assert( glGetError() == GL_NO_ERROR );
+    using namespace std ;
 
     // buffer para guardar el informe de errores al compilar o enlazar
     constexpr GLsizei long_buffer = 1024*16 ;
@@ -225,11 +307,11 @@ void Compilar_Shaders( )
     // activar el programa
     glUseProgram( id_prog );
 
-    // leer el identificador ("location") del parémtro uniform "matriz_transf_coord"
-    loc_matriz_transf_coords = glGetUniformLocation( id_prog, "matriz_transf_coords" );
+    // leer el identificador ("location") del parámetro uniform "u_matriz_transf_coord"
+    // poner esa matriz con un valor igual a la matriz identidad.
+    loc_matriz_transf_coords = glGetUniformLocation( id_prog, "u_matriz_transf_coords" );
     if ( loc_matriz_transf_coords == -1 )
-    {
-        cout << "Error: no encuentro variable uniform 'matriz_transf_coords'" << endl ;
+    {   cout << "Error: no encuentro variable uniform 'matriz_transf_coords'" << endl ;
         exit(1);
     }
     const GLfloat ident[] = 
@@ -241,21 +323,30 @@ void Compilar_Shaders( )
     glUniformMatrix4fv( loc_matriz_transf_coords, 1, GL_FALSE, ident );
 
     assert( glGetError() == GL_NO_ERROR );
-    cout << "fragment/vertex shader en uso, ok" << endl ;
-
-    //glUseProgram( 0 );
+    cout << "fragment y vertex shaders creados correctamente." << endl ;
+    glUseProgram( 0 );
 }
 // ---------------------------------------------------------------------------------------------
 
-void Inicializa_OpenGL()
+void InicializaOpenGL()
 {
-    Compilar_Shaders();
+    using namespace std ;
+
+    cout  << "Datos de versión e implementación de OpenGL" << endl
+         << "    implementación de : " << glGetString(GL_VENDOR)  << endl
+         << "    hardware          : " << glGetString(GL_RENDERER) << endl
+         << "    version de OpenGL : " << glGetString(GL_VERSION) << endl
+         << "    version de GLSL   : " << glGetString(GL_SHADING_LANGUAGE_VERSION) << endl ;
+
+    InicializaGLEW(); // Fijar puntero a funciones de OpenGL versión 2.0 y posteriores
+    CompilarShaders();
 
     glLineWidth( 8.3 );
+    glClearColor( 1.0, 1.0, 1.0, 0.0 ); // color para 'glClear' (blanco, 100% opaco)
 }
 // ---------------------------------------------------------------------------------------------
 
-void BucleEventos_GLFW() 
+void BucleEventosGLFW() 
 { 
     while ( ! terminar_programa )
     {   if ( redibujar_ventana ) 
@@ -271,12 +362,12 @@ void BucleEventos_GLFW()
 int main( int argc, char *argv[] )
 {
     using namespace std ;
-    cout << "Programa mínimo de OpenGL" << endl ;
+    cout << "Programa mínimo de OpenGL 2.1" << endl ;
 
-    Inicializa_GLFW( argc, argv ) ; // Crea una ventana
-    Inicializa_OpenGL() ;           // Compila vertex y fragment shaders. Enlaza y activa programa.
-    BucleEventos_GLFW() ;           // Esperar eventos y procesarlos
-    glfwTerminate();                // Terminar GLFW (cierra la ventana)
+    InicializaGLFW( argc, argv ); // Crea una ventana, fija funciones gestoras de eventos
+    InicializaOpenGL() ;          // Compila vertex y fragment shaders. Enlaza y activa programa. Inicializa GLEW.
+    BucleEventosGLFW() ;          // Esperar eventos y procesarlos hasta que 'terminar_programa == true'
+    glfwTerminate();              // Terminar GLFW (cierra la ventana)
 
     cout << "Programa terminado normalmente." << endl ;
 }
