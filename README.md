@@ -7,7 +7,7 @@ Incluye _makefile_ para macos y linux.
 ## Requisitos y compilación en Linux 
 
 En linux es necesario tener instalado el compilador de C++ de GNU o del proyecto LLVM. 
-Además se deben instalar los _packages_ 'libglew-dev' y 'glfw3-dev', se puede hacer con:
+Además se deben instalar los _packages_ **libglew-dev** y **glfw3-dev**, se puede hacer con:
 
 ```
 sudo apt install libglew-dev
@@ -19,7 +19,23 @@ Para compilar y ejecutar, hay que situarse en la carpeta `build/linux` y escribi
 ## Requisistos y compilación en macOS
 
 En ordenadores macOS hay que tener instalada la herramienta de desarrollo de **XCode**. 
-Además, se debe instalar **cmake**, disponible en esta Web: 
+Este herramienta de desarrollo incorpora el compilador de C++ del proyecto LLVM, así como el _framework_ de **OpenGL**.
+Usando la herramienta **homebrew** para mac, se puede instalar fácilmente la librería **GLFW**, con:
 
-Y la librerí GLFW, 
+```
+brew install glfw
+```
+Si no se quiere usar **homebrew**, se puede descargar **cmake** y usarlo para compilar GLFW después de descargar los fuentes.
+CMake está disponible aquí
+
+Una vez que se tiene disponible la orden `cmake`, se puede descargar el archivo _zip_ para macOS del sitio web de GLFW ([ http://www.glfw.org/download.html]( http://www.glfw.org/download.html)), y compilar la librería de esta forma:
+
+```
+cd glfw-....
+cmake -DBUILD_SHARED_LIBS=ON .
+make
+sudo make install
+```
+
+Para compilar y ejecutar, hay que situarse en la carpeta `build/macos` y escribir `make`
 
