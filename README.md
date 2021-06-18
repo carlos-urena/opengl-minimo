@@ -25,10 +25,9 @@ Usando la herramienta **homebrew** para mac, se puede instalar fácilmente la li
 ```
 brew install glfw
 ```
-Si no se quiere usar **homebrew**, se puede descargar **cmake** y usarlo para compilar GLFW después de descargar los fuentes.
-CMake está disponible aquí
 
-Una vez que se tiene disponible la orden `cmake`, se puede descargar el archivo _zip_ para macOS del sitio web de GLFW ([ http://www.glfw.org/download.html]( http://www.glfw.org/download.html)), y compilar la librería de esta forma:
+Si no se quiere usar **homebrew**, se puede descargar **cmake** para macOS ([https://cmake.org/download/](https://cmake.org/download/)).
+Una vez que se tiene disponible la orden `cmake`, se puede descargar el archivo _zip_ para macOS del sitio web de GLFW ([ http://www.glfw.org/download.html]( http://www.glfw.org/download.html)), después se abre el archivo en una carpeta nueva vacía, y al abrirlo se crea un subcarpeta de nombre `glfw-...` (los caracteres en el lugar de los puntos suspensivos dependen de la versión). Finalmente se puede compilar la librería de esta forma:
 
 ```
 cd glfw-....
