@@ -52,12 +52,6 @@ const GLfloat mat_ident[] =     // matriz 4x4 identidad
         0.0, 0.0, 0.0, 1.0, 
     } ;
 
-const GLfloat mat_despl[] =     // matriz 4x4 desplazamiento
-    {   1.0, 0.0, 0.0, 0.3, 
-        0.0, 1.0, 0.0, 0.0, 
-        0.0, 0.0, 1.0, 0.0, 
-        0.0, 0.0, 0.0, 1.0, 
-    } ;
 
 // ---------------------------------------------------------------------------------------------
 // Fuentes para el vertex shader y el fragment shader 
@@ -208,6 +202,16 @@ void VisualizarFrame( )
 
     // Dibujar un triángulo en modo diferido 
     DibujarTrianguloMD();
+
+    constexpr float incremento_z = -0.1 ;
+
+    const GLfloat mat_despl[] =     // matriz 4x4 desplazamiento
+    {   1.0, 0.0, 0.0, 0.2, 
+        0.0, 1.0, 0.0, 0.2, 
+        0.0, 0.0, 1.0, incremento_z, 
+        0.0, 0.0, 0.0, 1.0, 
+    } ;
+
 
     // Cambiar la matriz de transformación de coordenadas y volver a dibujar
     glUniformMatrix4fv( loc_matriz_transf_coords, 1, GL_TRUE, mat_despl );
