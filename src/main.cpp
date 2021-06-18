@@ -21,7 +21,7 @@
 
 
 // ---------------------------------------------------------------------------------------------
-// Variables globales 
+// Constantes y variables globales 
 
 bool 
     redibujar_ventana   = true ,  // puesto a true por los gestores de eventos cuando cambia el modelo y hay que regenerar la vista 
@@ -37,6 +37,21 @@ GLint
 
 GLenum 
     id_vao = 0 ; // identificador de VAO (vertex array object)
+
+
+const GLfloat mat_ident[] =     // matriz 4x4 identidad
+    {   1.0, 0.0, 0.0, 0.0, 
+        0.0, 1.0, 0.0, 0.0, 
+        0.0, 0.0, 1.0, 0.0, 
+        0.0, 0.0, 0.0, 1.0, 
+    } ;
+
+const GLfloat mat_despl[] =     // matriz 4x4 desplazamiento
+    {   1.0, 0.0, 0.0, 0.3, 
+        0.0, 1.0, 0.0, 0.0, 
+        0.0, 0.0, 1.0, 0.0, 
+        0.0, 0.0, 0.0, 1.0, 
+    } ;
 
 // ---------------------------------------------------------------------------------------------
 // Fuentes para el vertex shader y el fragment shader 
@@ -74,21 +89,11 @@ const char * const fuente_fs = R"glsl(
 )glsl";
 
 // ---------------------------------------------------------------------------------------------
-// función que se encarga de visualizar el contenido en la ventana
+// función que se encarga de visualizar un triángulo relleno en modo diferido
 
-void VisualizarFrame( ) 
-{ 
-    using namespace std ;
-    
-    assert( glGetError() == GL_NO_ERROR );
-
-    // establece la zona visible (toda la ventana)
-    glViewport( 0, 0, ancho_actual, alto_actual ); 
-    
-    // limpiar la ventana
-    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT ); 
-
-    assert( glGetError() == GL_NO_ERROR );
+void DibujarTrianguloMD( ) 
+{
+     assert( glGetError() == GL_NO_ERROR );
 
     // número de vértices que se van a dibujar
     constexpr unsigned
@@ -131,6 +136,70 @@ void VisualizarFrame( )
     glBindVertexArray( 0 );
 
     assert( glGetError() == GL_NO_ERROR );
+}
+
+// ---------------------------------------------------------------------------------------------
+// función que se encarga de visualizar un triángulo relleno en modo inmediato
+
+void DibujarTrianguloMI( ) 
+{
+     assert( glGetError() == GL_NO_ERROR );
+
+    // número de vértices que se van a dibujar
+    constexpr unsigned
+        num_verts = 3 ;
+
+    const GLfloat 
+        coordenadas[ num_verts*2 ] = {  -0.6, -0.6,      +0.6, -0.6,     0.0, 0.6      },
+        colores    [ num_verts*3 ] = {  1.0, 1.0, 0.0,   1.0, 0.0, 1.0,  0.0, 1.0, 1.0 } ;
+
+    // activar el VAO por defecto (en memoria de la app), deshabilitar punteros que no se usan (por si acaso)
+    glBindVertexArray( 0 ) ;
+    glDisableClientState( GL_TEXTURE_COORD_ARRAY );
+    glDisableClientState( GL_NORMAL_ARRAY );
+
+    // establecer y habilitar punteros
+    glVertexPointer( 2, GL_FLOAT, 0, coordenadas );  // indica puntero a array de coordenadas
+    glEnableClientState( GL_VERTEX_ARRAY );          // habilita uso del puntero al array de coordenadas
+    glColorPointer( 3, GL_FLOAT, 0, colores );       // indica puntero a array de colores
+    glEnableClientState( GL_COLOR_ARRAY );           // habilita uso del puntero al array de colores
+    
+    // configurar el modo y dibujar
+    glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+    glDrawArrays( GL_POLYGON, 0, num_verts );
+
+    // deshabilitar punteros (queda habilitado el VAO 0)
+    glDisableClientState( GL_VERTEX_ARRAY );
+    glDisableClientState( GL_COLOR_ARRAY );
+
+    assert( glGetError() == GL_NO_ERROR );
+}
+
+// ---------------------------------------------------------------------------------------------
+// función que se encarga de visualizar el contenido en la ventana
+
+void VisualizarFrame( ) 
+{ 
+    using namespace std ;
+    
+    assert( glGetError() == GL_NO_ERROR );
+
+    // establece la zona visible (toda la ventana)
+    glViewport( 0, 0, ancho_actual, alto_actual ); 
+
+    // establece la matriz de transformación de coordenadas, 
+    // la hace igual a la matriz identidad
+    glUniformMatrix4fv( loc_matriz_transf_coords, 1, GL_TRUE, mat_ident );
+    
+    // limpiar la ventana
+    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT ); 
+
+    // Dibujar un triángulo en modo diferido 
+    DibujarTrianguloMD();
+
+    // Cambiar la matriz de transformación de coordenadas y volver a dibujar
+    glUniformMatrix4fv( loc_matriz_transf_coords, 1, GL_TRUE, mat_despl );
+    DibujarTrianguloMI();
 
     // esperar a que termine 'glDrawArrays' y entonces presentar el framebuffer actualizado
     glfwSwapBuffers( ventana_glfw );
@@ -304,6 +373,8 @@ void CompilarShaders( )
 
     assert( glGetError() == GL_NO_ERROR );
 
+     
+
     // activar el programa
     glUseProgram( id_prog );
 
@@ -314,17 +385,12 @@ void CompilarShaders( )
     {   cout << "Error: no encuentro variable uniform 'matriz_transf_coords'" << endl ;
         exit(1);
     }
-    const GLfloat ident[] = 
-        {   1.0, 0.0, 0.0, 0.0, 
-            0.0, 1.0, 0.0, 0.0, 
-            0.0, 0.0, 1.0, 0.0, 
-            0.0, 0.0, 0.0, 1.0, 
-        } ;
-    glUniformMatrix4fv( loc_matriz_transf_coords, 1, GL_FALSE, ident );
+    
+    
 
     assert( glGetError() == GL_NO_ERROR );
     cout << "fragment y vertex shaders creados correctamente." << endl ;
-    glUseProgram( 0 );
+   
 }
 // ---------------------------------------------------------------------------------------------
 
