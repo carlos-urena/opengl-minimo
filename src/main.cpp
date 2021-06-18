@@ -4,10 +4,15 @@
 // ver: https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/
 //
 
-
+#include <cassert>  // para 'assert' (verificación de condiciones lógicas)
 #include <cstring>  // para 'strlen' (al compilar shaders)
 #include <iostream> 
 
+#ifdef LINUX 
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+#include <GL/glu.h> 
+#else 
 #ifdef MACOS
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
@@ -16,7 +21,8 @@
 #define glGenVertexArrays  glGenVertexArraysAPPLE
 #define glBindVertexArray  glBindVertexArrayAPPLE
 #else 
-#pragma error "no está definido MACOS ...."
+#pragma error "no está definido el sistema operativo"
+#endif
 #endif
 
 
@@ -296,11 +302,12 @@ void InicializaGLFW( int argc, char * argv[] )
 void InicializaGLEW()
 {
 #ifndef MACOS
+    using namespace std ;
     GLenum codigoError = glewInit();
     if ( codigoError != GLEW_OK ) // comprobar posibles errores
     {
         cout << "Imposible inicializar ’GLEW’, mensaje recibido: " << endl 
-             < (const char *)glewGetErrorString(codigoError) << endl ;
+             << (const char *)glewGetErrorString( codigoError ) << endl ;
         exit(1);
     }
     else
