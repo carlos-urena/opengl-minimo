@@ -14,8 +14,6 @@ sudo apt install libglew-dev
 sudo apt install glfw3-dev
 ```
 
-Para compilar y ejecutar, hay que situarse en la carpeta `build/linux` y escribir `make`
-
 ## Requisistos en macOS
 
 En ordenadores macOS hay que tener instalada la herramienta de desarrollo de **XCode**. 
@@ -28,7 +26,7 @@ brew install glfw
 
 Si no se quiere usar **homebrew**, se puede descargar **cmake** para macOS ([https://cmake.org/download/](https://cmake.org/download/)).
 
-Una vez que se tiene disponible la orden `cmake`, se puede descargar el archivo _zip_ de GLFW para macOS del sitio web de GLFW ([ http://www.glfw.org/download.html](http://www.glfw.org/download.html)), después se abre el archivo en una carpeta nueva vacía, y al abrirlo se crea un subcarpeta de nombre `glfw-...` (los caracteres concretos en el lugar de los puntos suspensivos dependen de la versión, estos fuentes requieren la versión 3). Finalmente se puede compilar la librería de esta forma:
+Una vez que se tiene disponible la orden `cmake`, se puede descargar el archivo _zip_ de GLFW para macOS del sitio web de GLFW ([http://www.glfw.org/download.html](http://www.glfw.org/download.html)), después se abre el archivo en una carpeta nueva vacía, y al abrirlo se crea un subcarpeta de nombre `glfw-...` (los caracteres concretos en el lugar de los puntos suspensivos dependen de la versión, estos fuentes requieren la versión 3). Finalmente se puede compilar la librería de esta forma:
 
 ```
 cd glfw-....
@@ -36,9 +34,6 @@ cmake -DBUILD_SHARED_LIBS=ON .
 make
 sudo make install
 ```
-
-Para compilar y ejecutar, hay que situarse en la carpeta `build/macos` y escribir `make`
-
 
 ## Compilación y ejecución (Linux o macOS)
 

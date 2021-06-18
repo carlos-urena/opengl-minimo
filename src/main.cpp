@@ -115,6 +115,8 @@ void DibujarTrianguloMD( )
         // crear y activar el VAO
         glGenVertexArrays( 1, &id_vao ); // crear VAO
         glBindVertexArray( id_vao );     // activa VAO
+        glDisableClientState( GL_NORMAL_ARRAY );   // no usaremos array de normales
+        glDisableClientState( GL_TEXTURE_COORD_ARRAY ); // no usaremos array de coordenadas de textura
 
         // crear el VBO de coordenadas, y fijar puntero a la tabla de coordenadas
         GLenum  id_vbo_coordenadas ;
@@ -122,6 +124,7 @@ void DibujarTrianguloMD( )
         glBindBuffer( GL_ARRAY_BUFFER, id_vbo_coordenadas );  // activa VBO verts.                            
         glBufferData( GL_ARRAY_BUFFER, 2*num_verts*sizeof(float), coordenadas, GL_STATIC_DRAW ); // copia
         glVertexPointer( 2, GL_FLOAT, 0, 0 );  // indica puntero a array de coordenadas
+        glBindBuffer( GL_ARRAY_BUFFER, 0 );
         glEnableClientState( GL_VERTEX_ARRAY ); // habilita uso de array de coordenadas
 
         // crear el VBO de colores, y fijar puntero a la tabla de colores
@@ -130,6 +133,7 @@ void DibujarTrianguloMD( )
         glBindBuffer( GL_ARRAY_BUFFER, id_vbo_colores );   // activa VBO colores                           
         glBufferData( GL_ARRAY_BUFFER, 3*num_verts*sizeof(float), colores, GL_STATIC_DRAW ); // copia
         glColorPointer( 3, GL_FLOAT, 0, 0 );    // indica puntero a array de colores
+        glBindBuffer( GL_ARRAY_BUFFER, 0 );
         glEnableClientState( GL_COLOR_ARRAY );  // habilita uso de array de colores
     }
     else
@@ -137,7 +141,6 @@ void DibujarTrianguloMD( )
 
     // dibujar y desactivar el VAO
     glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-    glShadeModel( GL_SMOOTH );
     glDrawArrays( GL_POLYGON, 0, num_verts );
     glBindVertexArray( 0 );
 
@@ -155,6 +158,7 @@ void DibujarTrianguloMI( )
     constexpr unsigned
         num_verts = 3 ;
 
+    // coordenadas y colores de los vértices
     const GLfloat 
         coordenadas[ num_verts*2 ] = {  -0.6, -0.6,      +0.6, -0.6,     0.0, 0.6      },
         colores    [ num_verts*3 ] = {  1.0, 1.0, 0.0,   1.0, 0.0, 1.0,  0.0, 1.0, 1.0 } ;
@@ -199,6 +203,8 @@ void VisualizarFrame( )
     
     // limpiar la ventana
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT ); 
+
+    glEnable( GL_DEPTH_TEST );
 
     // Dibujar un triángulo en modo diferido 
     DibujarTrianguloMD();
