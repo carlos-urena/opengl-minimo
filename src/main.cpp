@@ -8,7 +8,7 @@
 #include <cstring>  // para 'strlen' (al compilar shaders)
 #include <iostream> 
 
-#ifdef LINUX 
+#ifdef __linux__ 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <GL/glu.h> 
