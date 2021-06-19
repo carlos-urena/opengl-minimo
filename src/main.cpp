@@ -8,20 +8,25 @@
 #include <cstring>  // para 'strlen' (al compilar shaders)
 #include <iostream> 
 
-#ifdef __linux__ 
+#ifdef __linux__
+// -----------------------------------------------
+// Includes y definiciones específicos en Linux
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <GL/glu.h> 
 #else 
 #ifdef __APPLE__
+//------------------------------------------------
+// Includes y definiciones específicos en macOS
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
 #include <GLFW/glfw3.h>  
-
 #define glGenVertexArrays  glGenVertexArraysAPPLE
 #define glBindVertexArray  glBindVertexArrayAPPLE
 #else 
-#pragma error "no está definido el sistema operativo"
+// ------------------------------------------------
+// Emitir error por sistema operativo no soportado
+#error "No puedo determinar el sistema operativo, o no esta soportado"
 #endif
 #endif
 
@@ -311,7 +316,7 @@ void InicializaGLFW( int argc, char * argv[] )
 
 void InicializaGLEW()
 {
-#ifndef MACOS
+#ifndef __APPLE__
     using namespace std ;
     GLenum codigoError = glewInit();
     if ( codigoError != GLEW_OK ) // comprobar posibles errores
@@ -424,7 +429,7 @@ void InicializaOpenGL()
     InicializaGLEW(); // Fijar puntero a funciones de OpenGL versión 2.0 y posteriores
     CompilarShaders();
 
-    glLineWidth( 8.3 );
+    glLineWidth( 1.7 );
     glClearColor( 1.0, 1.0, 1.0, 0.0 ); // color para 'glClear' (blanco, 100% opaco)
 }
 // ---------------------------------------------------------------------------------------------
