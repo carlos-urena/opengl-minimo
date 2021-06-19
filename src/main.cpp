@@ -13,7 +13,7 @@
 #include <GLFW/glfw3.h>
 #include <GL/glu.h> 
 #else 
-#ifdef MACOS
+#ifdef __APPLE__
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
 #include <GLFW/glfw3.h>  
