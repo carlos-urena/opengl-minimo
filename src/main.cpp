@@ -57,6 +57,11 @@ const GLfloat mat_ident[] =     // matriz 4x4 identidad
         0.0, 0.0, 0.0, 1.0, 
     } ;
 
+// buffer para guardar el informe de errores al compilar o enlazar
+constexpr GLsizei long_buffer = 1024*16 ;
+GLchar            buffer[ long_buffer ] ;
+GLsizei           long_informe ;  // longitud del informe de errores 
+
 
 // ---------------------------------------------------------------------------------------------
 // Fuentes para el vertex shader y el fragment shader 
@@ -72,7 +77,7 @@ const char * const fuente_vs = R"glsl(
     uniform mat4 u_matriz_transf_coords; // variable uniform: matriz de transformación de coordenadas
     varying vec4 v_color ; // variable de salida: color del vértice
 
-    void main() 
+    void main()
     {
         v_color     = gl_Color ; // el color del vértice es el enviado por la aplicación.
         gl_Position = u_matriz_transf_coords *  gl_Vertex;  // transforma coordenadas   
@@ -330,6 +335,39 @@ void InicializaGLEW()
 
 #endif
 }
+// -------------------------------------------------------------------------
+// si ha habido algún error al compilar un shader, imprime informe y aborta 
+
+void VerErroresCompilar( const GLuint id_shader, const char * nombre_shader )
+{
+    GLint estado_vs ; 
+    glGetShaderiv( id_shader, GL_COMPILE_STATUS, &estado_vs );
+    if ( estado_vs == GL_TRUE )
+        return ;
+
+    using namespace std ;
+    cout << "Error al compilar " << nombre_shader << ". Aborto." << endl ;
+    glGetShaderInfoLog( id_shader, long_buffer, &long_informe, buffer );
+    cout << buffer << endl ;
+    exit(1);
+}
+// -------------------------------------------------------------------------
+// si ha habido algún error al enlazar, imprime informe y aborta
+
+void VerErroresEnlazar( const GLuint id_prog )
+{
+    GLint estado_prog ;
+    glGetProgramiv( id_prog, GL_LINK_STATUS, &estado_prog );
+    if ( estado_prog == GL_TRUE ) 
+        return ;
+
+    using namespace std ;
+    cout << "Error al enlazar el programa. Aborto." << endl ;
+    glGetProgramInfoLog( id_prog, long_buffer, &long_informe, buffer );
+    cout << buffer << endl ;
+    exit(1);
+    
+}
 // ---------------------------------------------------------------------------------------------
 // función que compila el vertex y el fragment shader
 
@@ -338,78 +376,40 @@ void CompilarShaders( )
     assert( glGetError() == GL_NO_ERROR );
     using namespace std ;
 
-    // buffer para guardar el informe de errores al compilar o enlazar
-    constexpr GLsizei long_buffer = 1024*16 ;
-    GLchar            buffer[ long_buffer ] ;
-    GLsizei           long_informe ;  // longitud del informe de errores
-
-    // longitudes en bytes (caracteres) de los fuentes
-    const GLint longitud_vs = strlen( fuente_vs ),
-                longitud_fs = strlen( fuente_fs );
-
     // crear y compilar el vertex shader
-    const GLuint id_vs = glCreateShader( GL_VERTEX_SHADER );
-    glShaderSource( id_vs, 1, &fuente_vs,  &longitud_vs ) ;
+    const GLuint id_vs   = glCreateShader( GL_VERTEX_SHADER );
+    const GLint  long_vs = strlen( fuente_vs ) ;
+    glShaderSource( id_vs, 1, &fuente_vs,  &long_vs ) ;
     glCompileShader( id_vs ) ;
-
-    // ver errores al compilar el vertex shader, si hay alguno, si hay abortar
-    GLint estado_vs ; 
-    glGetShaderiv( id_vs, GL_COMPILE_STATUS, &estado_vs );
-    if ( estado_vs != GL_TRUE )
-    {   cout << "Error al compilar el vertex shader. Aborto." << endl ;
-        glGetShaderInfoLog( id_vs, long_buffer, &long_informe, buffer );
-        cout << buffer << endl ;
-        exit(1);
-    }
+    VerErroresCompilar( id_vs, "vertex shader" );
 
     // crear y compilar el fragment shader
-    const GLuint id_fs = glCreateShader( GL_FRAGMENT_SHADER ) ;
-    glShaderSource( id_fs, 1, &fuente_fs, &longitud_fs ) ;
+    const GLuint id_fs   = glCreateShader( GL_FRAGMENT_SHADER ) ;
+    const GLint  long_fs = strlen( fuente_fs );
+    glShaderSource( id_fs, 1, &fuente_fs, &long_fs ) ;
     glCompileShader( id_fs ) ;
-
-    // ver errores al compilar el fragment shader, si hay alguno, si hay abortar
-    GLint estado_fs ; 
-    glGetShaderiv( id_fs, GL_COMPILE_STATUS, &estado_fs );
-    if ( estado_fs != GL_TRUE )
-    {   cout << "Error al compilar el fragment shader. Aborto." << endl ;
-        glGetShaderInfoLog( id_fs, long_buffer, &long_informe, buffer );
-        cout << buffer << endl ;
-        exit(1);
-    }
+    VerErroresCompilar( id_fs, "fragment shader" );
 
     // crear programa, asociar shaders al programa, enlazar.
     const GLuint id_prog = glCreateProgram() ;
     glAttachShader( id_prog, id_vs );
     glAttachShader( id_prog, id_fs );
     glLinkProgram( id_prog ) ;
-
-    // ver errores al enlazar el fragment shader
-    GLint estado_prog ;
-    glGetProgramiv( id_prog, GL_LINK_STATUS, &estado_prog );
-    if ( estado_prog != GL_TRUE )
-    {   cout << "Error al enlazar el programa. Aborto." << endl ;
-        glGetProgramInfoLog( id_prog, long_buffer, &long_informe, buffer );
-        cout << buffer << endl ;
-        exit(1);
-    }
+    VerErroresEnlazar( id_prog );
 
     assert( glGetError() == GL_NO_ERROR );
-
-     
 
     // activar el programa
     glUseProgram( id_prog );
 
     // leer el identificador ("location") del parámetro uniform "u_matriz_transf_coord"
-    // poner esa matriz con un valor igual a la matriz identidad.
+    // (cada vez que se visualiza se le da valor, en concreto se hace igual a la matriz identidad.
     loc_matriz_transf_coords = glGetUniformLocation( id_prog, "u_matriz_transf_coords" );
     if ( loc_matriz_transf_coords == -1 )
     {   cout << "Error: no encuentro variable uniform 'matriz_transf_coords'" << endl ;
         exit(1);
     }
     
-    
-
     assert( glGetError() == GL_NO_ERROR );
     cout << "fragment y vertex shaders creados correctamente." << endl ;
    
