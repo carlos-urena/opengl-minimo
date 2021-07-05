@@ -47,8 +47,8 @@ GLint
     loc_matriz_transf_coords  ;
 
 GLenum 
-    id_vao = 0 ; // identificador de VAO (vertex array object)
-
+    id_vao      = 0 , // identificador de VAO (vertex array object) para dibujo en modo diferido (secuencia no indexada)
+    id_vao_ind  = 0 ; // identificador de VAO para dibujo en modo diferido de una secuencia indexada
 
 const GLfloat mat_ident[] =     // matriz 4x4 identidad
     {   1.0, 0.0, 0.0, 0.0, 
@@ -97,6 +97,86 @@ const char * const fuente_fs = R"glsl(
         gl_FragColor = v_color ; // el color del pixel es el color interpolado
     }
 )glsl";
+
+
+
+// ---------------------------------------------------------------------------------------------
+// función que se encarga de visualizar un triángulo relleno en modo inmediato
+
+void DibujarTrianguloMI( ) 
+{
+     assert( glGetError() == GL_NO_ERROR );
+
+    // número de vértices que se van a dibujar
+    constexpr unsigned
+        num_verts = 3 ;
+
+    // coordenadas y colores de los vértices
+    const GLfloat 
+        coordenadas[ num_verts*2 ] = {  -0.6, -0.6,      +0.6, -0.6,     0.0, 0.6      },
+        colores    [ num_verts*3 ] = {  1.0, 1.0, 0.0,   1.0, 0.0, 1.0,  0.0, 1.0, 1.0 } ;
+
+    // activar el VAO por defecto (en memoria de la app), deshabilitar punteros que no se usan (por si acaso)
+    glBindVertexArray( 0 ) ;
+    glDisableClientState( GL_TEXTURE_COORD_ARRAY );
+    glDisableClientState( GL_NORMAL_ARRAY );
+
+    // establecer y habilitar punteros
+    glVertexPointer( 2, GL_FLOAT, 0, coordenadas );  // indica puntero a array de coordenadas
+    glEnableClientState( GL_VERTEX_ARRAY );          // habilita uso del puntero al array de coordenadas
+    glColorPointer( 3, GL_FLOAT, 0, colores );       // indica puntero a array de colores
+    glEnableClientState( GL_COLOR_ARRAY );           // habilita uso del puntero al array de colores
+    
+    // configurar el modo y dibujar
+    glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+    glDrawArrays( GL_POLYGON, 0, num_verts );
+
+    // deshabilitar punteros (queda habilitado el VAO 0)
+    glDisableClientState( GL_VERTEX_ARRAY );
+    glDisableClientState( GL_COLOR_ARRAY );
+
+    assert( glGetError() == GL_NO_ERROR );
+}
+
+// ---------------------------------------------------------------------------------------------
+// función que se encarga de visualizar un triángulo (indexado) relleno en modo inmediato
+
+void DibujarTrianguloIndexadoMI( ) 
+{
+     assert( glGetError() == GL_NO_ERROR );
+
+    // número de vértices que se van a dibujar
+    constexpr unsigned
+        num_verts = 3 ;
+
+    // coordenadas, colores de los vértices, y tabla de índices
+    const GLfloat 
+        coordenadas[ num_verts*2 ] = {  -0.6, -0.6,      +0.6, -0.6,     0.0, 0.6      },
+        colores    [ num_verts*3 ] = {  1.0, 1.0, 0.0,   1.0, 0.0, 1.0,  0.0, 1.0, 1.0 } ;
+    const GLuint 
+        indices[ num_verts ] = { 0,1,2 } ;
+
+    // activar el VAO por defecto (en memoria de la app), deshabilitar punteros que no se usan (por si acaso)
+    glBindVertexArray( 0 ) ;
+    glDisableClientState( GL_TEXTURE_COORD_ARRAY );
+    glDisableClientState( GL_NORMAL_ARRAY );
+
+    // establecer y habilitar punteros
+    glVertexPointer( 2, GL_FLOAT, 0, coordenadas );  // indica puntero a array de coordenadas
+    glEnableClientState( GL_VERTEX_ARRAY );          // habilita uso del puntero al array de coordenadas
+    glColorPointer( 3, GL_FLOAT, 0, colores );       // indica puntero a array de colores
+    glEnableClientState( GL_COLOR_ARRAY );           // habilita uso del puntero al array de colores
+    
+    // configurar el modo y dibujar
+    glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+    glDrawElements( GL_POLYGON, num_verts, GL_UNSIGNED_INT, indices );
+
+    // deshabilitar punteros (queda habilitado el VAO 0)
+    glDisableClientState( GL_VERTEX_ARRAY );
+    glDisableClientState( GL_COLOR_ARRAY );
+
+    assert( glGetError() == GL_NO_ERROR );
+}
 
 // ---------------------------------------------------------------------------------------------
 // función que se encarga de visualizar un triángulo relleno en modo diferido
@@ -152,9 +232,9 @@ void DibujarTrianguloMD( )
 }
 
 // ---------------------------------------------------------------------------------------------
-// función que se encarga de visualizar un triángulo relleno en modo inmediato
+// función que se encarga de visualizar un triángulo indexado relleno en modo diferido
 
-void DibujarTrianguloMI( ) 
+void DibujarTrianguloIndexadoMD( ) 
 {
      assert( glGetError() == GL_NO_ERROR );
 
@@ -162,29 +242,52 @@ void DibujarTrianguloMI( )
     constexpr unsigned
         num_verts = 3 ;
 
-    // coordenadas y colores de los vértices
-    const GLfloat 
-        coordenadas[ num_verts*2 ] = {  -0.6, -0.6,      +0.6, -0.6,     0.0, 0.6      },
-        colores    [ num_verts*3 ] = {  1.0, 1.0, 0.0,   1.0, 0.0, 1.0,  0.0, 1.0, 1.0 } ;
+    if ( id_vao_ind == 0 )
+    {
+        // tablas de coordenadas y colores de vértices (coordenadas en 2D, con Z=0) 
+        const GLfloat 
+            coordenadas[ num_verts*2 ] = {  -0.8, -0.8,      +0.8, -0.8,     0.0, 0.8      },
+            colores    [ num_verts*3 ] = {  1.0, 0.0, 0.0,   0.0, 1.0, 0.0,  0.0, 0.0, 1.0 } ;
+        const GLuint 
+            indices[ num_verts ] = { 0,1,2 } ;
+        
+        // crear y activar el VAO
+        glGenVertexArrays( 1, &id_vao_ind ); // crear VAO
+        glBindVertexArray( id_vao_ind );     // activa VAO
+        glDisableClientState( GL_NORMAL_ARRAY );   // no usaremos array de normales
+        glDisableClientState( GL_TEXTURE_COORD_ARRAY ); // no usaremos array de coordenadas de textura
 
-    // activar el VAO por defecto (en memoria de la app), deshabilitar punteros que no se usan (por si acaso)
-    glBindVertexArray( 0 ) ;
-    glDisableClientState( GL_TEXTURE_COORD_ARRAY );
-    glDisableClientState( GL_NORMAL_ARRAY );
+        // crear el VBO de coordenadas, y fijar puntero a la tabla de coordenadas
+        GLenum  id_vbo_coordenadas = 0;
+        glGenBuffers( 1, &id_vbo_coordenadas );               // crea VBO verts.
+        glBindBuffer( GL_ARRAY_BUFFER, id_vbo_coordenadas );  // activa VBO verts.                            
+        glBufferData( GL_ARRAY_BUFFER, 2*num_verts*sizeof(float), coordenadas, GL_STATIC_DRAW ); // copia valores a GPU
+        glVertexPointer( 2, GL_FLOAT, 0, 0 );  // indica puntero a array de coordenadas
+        glBindBuffer( GL_ARRAY_BUFFER, 0 );
+        glEnableClientState( GL_VERTEX_ARRAY ); // habilita uso de array de coordenadas
 
-    // establecer y habilitar punteros
-    glVertexPointer( 2, GL_FLOAT, 0, coordenadas );  // indica puntero a array de coordenadas
-    glEnableClientState( GL_VERTEX_ARRAY );          // habilita uso del puntero al array de coordenadas
-    glColorPointer( 3, GL_FLOAT, 0, colores );       // indica puntero a array de colores
-    glEnableClientState( GL_COLOR_ARRAY );           // habilita uso del puntero al array de colores
-    
-    // configurar el modo y dibujar
+        // crear el VBO de colores, y fijar puntero a la tabla de colores
+        GLenum id_vbo_colores  ;
+        glGenBuffers( 1, &id_vbo_colores );  // crea VBO colores
+        glBindBuffer( GL_ARRAY_BUFFER, id_vbo_colores );   // activa VBO colores                           
+        glBufferData( GL_ARRAY_BUFFER, 3*num_verts*sizeof(float), colores, GL_STATIC_DRAW ); // copia valores a GPU
+        glColorPointer( 3, GL_FLOAT, 0, 0 );    // indica puntero a array de colores
+        glBindBuffer( GL_ARRAY_BUFFER, 0 );
+        glEnableClientState( GL_COLOR_ARRAY );  // habilita uso de array de colores
+
+        // crear y activar el VBO de índices (y dejarlo activado)
+        GLenum id_vbo_indices  ;
+        glGenBuffers( 1, &id_vbo_indices );  // crea VBO colores
+        glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, id_vbo_indices );   // activa VBO colores                           
+        glBufferData( GL_ELEMENT_ARRAY_BUFFER, num_verts*sizeof(GLuint), indices, GL_STATIC_DRAW ); // copia valores a GPU
+    }
+    else
+        glBindVertexArray( id_vao_ind );
+
+    // dibujar y desactivar el VAO
     glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-    glDrawArrays( GL_POLYGON, 0, num_verts );
-
-    // deshabilitar punteros (queda habilitado el VAO 0)
-    glDisableClientState( GL_VERTEX_ARRAY );
-    glDisableClientState( GL_COLOR_ARRAY );
+    glDrawElements( GL_POLYGON, num_verts, GL_UNSIGNED_INT, 0 );
+    glBindVertexArray( 0 );
 
     assert( glGetError() == GL_NO_ERROR );
 }
@@ -211,11 +314,11 @@ void VisualizarFrame( )
     glEnable( GL_DEPTH_TEST );
 
     // Dibujar un triángulo en modo diferido 
-    DibujarTrianguloMD();
+    DibujarTrianguloIndexadoMD();
 
     constexpr float incremento_z = -0.1 ;
 
-    const GLfloat mat_despl[] =     // matriz 4x4 desplazamiento
+    const GLfloat mat_despl[] =     // matriz 4x4 (desplazamiento en X, Y y Z)
     {   1.0, 0.0, 0.0, 0.2, 
         0.0, 1.0, 0.0, 0.2, 
         0.0, 0.0, 1.0, incremento_z, 
@@ -225,7 +328,7 @@ void VisualizarFrame( )
 
     // Cambiar la matriz de transformación de coordenadas y volver a dibujar
     glUniformMatrix4fv( loc_matriz_transf_coords, 1, GL_TRUE, mat_despl );
-    DibujarTrianguloMI();
+    DibujarTrianguloIndexadoMI();
 
     // esperar a que termine 'glDrawArrays' y entonces presentar el framebuffer actualizado
     glfwSwapBuffers( ventana_glfw );
