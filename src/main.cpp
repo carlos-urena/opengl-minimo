@@ -139,7 +139,7 @@ void DibujarTrianguloMI( )
 }
 
 // ---------------------------------------------------------------------------------------------
-// función que se encarga de visualizar un triángulo (indexado) relleno en modo inmediato
+// función que se encarga de visualizar un triángulo (indexado) relleno en modo inmediato (MI)
 
 void DibujarTrianguloIndexadoMI( ) 
 {
