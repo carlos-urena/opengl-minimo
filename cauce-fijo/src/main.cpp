@@ -1,4 +1,4 @@
-// Ejemplo mínimo de código OpenGL, usa OpenGL 2.1 + GLSL 1.2
+// Ejemplo mínimo de código OpenGL, usa OpenGL 2.1, cauce fijo
 //
 // Ver referencia de la API aquí:
 // ver: https://www.khronos.org/registry/OpenGL-Refpages/gl2.1/
@@ -42,56 +42,10 @@ GLFWwindow *
 int 
     ancho_actual        = 512 ,      // ancho actual del framebuffer, en pixels
     alto_actual         = 512 ;      // alto actual del framebuffer, en pixels
-
-GLint 
-    loc_matriz_transf_coords  ;
-
 GLenum 
-    id_vao = 0 ; // identificador de VAO (vertex array object)
+    id_vao              = 0 ; // identificador de VAO (vertex array object)
 
 
-const GLfloat mat_ident[] =     // matriz 4x4 identidad
-    {   1.0, 0.0, 0.0, 0.0, 
-        0.0, 1.0, 0.0, 0.0, 
-        0.0, 0.0, 1.0, 0.0, 
-        0.0, 0.0, 0.0, 1.0, 
-    } ;
-
-
-// ---------------------------------------------------------------------------------------------
-// Fuentes para el vertex shader y el fragment shader 
-
-// fuente para el vertex shader sencillo, se invoca una vez por cada vértice. 
-// su función es escribir en 'gl_Position' las coordenadas del vértice 
-// además, puede escribir otros atributos del vértice en variables 'varying'
-// (en este caso escribe el color en 'v_color')
-
-const char * const fuente_vs = R"glsl(
-    #version 120
-    
-    uniform mat4 u_matriz_transf_coords; // variable uniform: matriz de transformación de coordenadas
-    varying vec4 v_color ; // variable de salida: color del vértice
-
-    void main() 
-    {
-        v_color     = gl_Color ; // el color del vértice es el enviado por la aplicación.
-        gl_Position = u_matriz_transf_coords *  gl_Vertex;  // transforma coordenadas   
-    }
-)glsl";
-
-// fuente para el fragment shader sencillo: se invoca una vez por cada pixel.
-// su función es escribir en 'gl_FragColor' el color del pixel 
-
-const char * const fuente_fs = R"glsl(
-    #version 120
-    
-    varying vec4 v_color ; // variable de entrada: color interpolado.
-    
-    void main() 
-    {
-        gl_FragColor = v_color ; // el color del pixel es el color interpolado
-    }
-)glsl";
 
 // ---------------------------------------------------------------------------------------------
 // función que se encarga de visualizar un triángulo relleno en modo diferido
@@ -196,14 +150,14 @@ void VisualizarFrame( )
     // establece la zona visible (toda la ventana)
     glViewport( 0, 0, ancho_actual, alto_actual ); 
 
-    // establece la matriz de transformación de coordenadas, 
-    // la hace igual a la matriz identidad
-    glUniformMatrix4fv( loc_matriz_transf_coords, 1, GL_TRUE, mat_ident );
-    
     // limpiar la ventana
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT ); 
 
-    glEnable( GL_DEPTH_TEST );
+    
+
+    // fijar matriz de transformación de coordenadas a la matriz identidad
+    glMatrixMode( GL_MODELVIEW );
+    glLoadIdentity();
 
     // Dibujar un triángulo en modo diferido 
     DibujarTrianguloMD();
@@ -219,7 +173,8 @@ void VisualizarFrame( )
 
 
     // Cambiar la matriz de transformación de coordenadas y volver a dibujar
-    glUniformMatrix4fv( loc_matriz_transf_coords, 1, GL_TRUE, mat_despl );
+    
+    glMultTransposeMatrixf( mat_despl );
     DibujarTrianguloMI();
 
     // esperar a que termine 'glDrawArrays' y entonces presentar el framebuffer actualizado
@@ -331,90 +286,6 @@ void InicializaGLEW()
 #endif
 }
 // ---------------------------------------------------------------------------------------------
-// función que compila el vertex y el fragment shader
-
-void CompilarShaders( ) 
-{ 
-    assert( glGetError() == GL_NO_ERROR );
-    using namespace std ;
-
-    // buffer para guardar el informe de errores al compilar o enlazar
-    constexpr GLsizei long_buffer = 1024*16 ;
-    GLchar            buffer[ long_buffer ] ;
-    GLsizei           long_informe ;  // longitud del informe de errores
-
-    // longitudes en bytes (caracteres) de los fuentes
-    const GLint longitud_vs = strlen( fuente_vs ),
-                longitud_fs = strlen( fuente_fs );
-
-    // crear y compilar el vertex shader
-    const GLuint id_vs = glCreateShader( GL_VERTEX_SHADER );
-    glShaderSource( id_vs, 1, &fuente_vs,  &longitud_vs ) ;
-    glCompileShader( id_vs ) ;
-
-    // ver errores al compilar el vertex shader, si hay alguno, si hay abortar
-    GLint estado_vs ; 
-    glGetShaderiv( id_vs, GL_COMPILE_STATUS, &estado_vs );
-    if ( estado_vs != GL_TRUE )
-    {   cout << "Error al compilar el vertex shader. Aborto." << endl ;
-        glGetShaderInfoLog( id_vs, long_buffer, &long_informe, buffer );
-        cout << buffer << endl ;
-        exit(1);
-    }
-
-    // crear y compilar el fragment shader
-    const GLuint id_fs = glCreateShader( GL_FRAGMENT_SHADER ) ;
-    glShaderSource( id_fs, 1, &fuente_fs, &longitud_fs ) ;
-    glCompileShader( id_fs ) ;
-
-    // ver errores al compilar el fragment shader, si hay alguno, si hay abortar
-    GLint estado_fs ; 
-    glGetShaderiv( id_fs, GL_COMPILE_STATUS, &estado_fs );
-    if ( estado_fs != GL_TRUE )
-    {   cout << "Error al compilar el fragment shader. Aborto." << endl ;
-        glGetShaderInfoLog( id_fs, long_buffer, &long_informe, buffer );
-        cout << buffer << endl ;
-        exit(1);
-    }
-
-    // crear programa, asociar shaders al programa, enlazar.
-    const GLuint id_prog = glCreateProgram() ;
-    glAttachShader( id_prog, id_vs );
-    glAttachShader( id_prog, id_fs );
-    glLinkProgram( id_prog ) ;
-
-    // ver errores al enlazar el fragment shader
-    GLint estado_prog ;
-    glGetProgramiv( id_prog, GL_LINK_STATUS, &estado_prog );
-    if ( estado_prog != GL_TRUE )
-    {   cout << "Error al enlazar el programa. Aborto." << endl ;
-        glGetProgramInfoLog( id_prog, long_buffer, &long_informe, buffer );
-        cout << buffer << endl ;
-        exit(1);
-    }
-
-    assert( glGetError() == GL_NO_ERROR );
-
-     
-
-    // activar el programa
-    glUseProgram( id_prog );
-
-    // leer el identificador ("location") del parámetro uniform "u_matriz_transf_coord"
-    // poner esa matriz con un valor igual a la matriz identidad.
-    loc_matriz_transf_coords = glGetUniformLocation( id_prog, "u_matriz_transf_coords" );
-    if ( loc_matriz_transf_coords == -1 )
-    {   cout << "Error: no encuentro variable uniform 'matriz_transf_coords'" << endl ;
-        exit(1);
-    }
-    
-    
-
-    assert( glGetError() == GL_NO_ERROR );
-    cout << "fragment y vertex shaders creados correctamente." << endl ;
-   
-}
-// ---------------------------------------------------------------------------------------------
 
 void InicializaOpenGL()
 {
@@ -426,11 +297,17 @@ void InicializaOpenGL()
          << "    version de OpenGL : " << glGetString(GL_VERSION) << endl
          << "    version de GLSL   : " << glGetString(GL_SHADING_LANGUAGE_VERSION) << endl ;
 
-    InicializaGLEW(); // Fijar puntero a funciones de OpenGL versión 2.0 y posteriores
-    CompilarShaders();
+    // Fijar puntero a funciones de OpenGL versión 2.0 y posteriores
+    InicializaGLEW();
 
+    // habilitar comprobación de profundidad
+    glEnable( GL_DEPTH_TEST );
+
+    // fijar ancho de líneas
     glLineWidth( 1.7 );
-    glClearColor( 1.0, 1.0, 1.0, 0.0 ); // color para 'glClear' (blanco, 100% opaco)
+
+    // color para 'glClear' (blanco, 100% opaco)
+    glClearColor( 1.0, 1.0, 1.0, 0.0 );
 }
 // ---------------------------------------------------------------------------------------------
 

@@ -1,7 +1,11 @@
 # opengl-minimo
 
 Un ejemplo de un código fuente OpenGL (ver 2.1), con funcionalidad mínima, en C++ (versión 2011). 
-Usa [GLFW 3](https://github.com/glfw/glfw) para eventos y ventanas. Usa shaders básicos escritos en GLSL (ver 1.2). 
+Usa [GLFW 3](https://github.com/glfw/glfw) para eventos y ventanas. Hay dos versiones: 
+
+* Una que únicamente usa el cauce fijo.
+* Una que usa cauce programable (shaders básicos escritos en GLSL, versión 1.2. 
+
 Incluye _makefile_ para macos y linux. 
 
 ## Requisitos en Linux 
@@ -37,5 +41,5 @@ sudo make install
 
 ## Compilación y ejecución (Linux o macOS)
 
-Para compilar y ejecutar, nos situamos en la carpeta `build/linux` o `build/macos` (según el sistema operativo), y hacemos `make`. Esto compila si es necesario, y luego ejecuta el programa.
+Para compilar y ejecutar, nos situamos en la carpeta `cauce-fijo/build/linux` o `cauce-fijo/build/macos` (según el sistema operativo), y hacemos `make`. Esto compila si es necesario, y luego ejecuta el programa, en la versión del cauce fijo. Igualmente se puede hacer para la versión del cauce programable, usando la carpeta `cauce-programable`.
 
