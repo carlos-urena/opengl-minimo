@@ -221,7 +221,7 @@ void VisualizarFrame( )
 
     // Cambiar la matriz de transformación de coordenadas y volver a dibujar
     glUniformMatrix4fv( loc_modelview, 1, GL_TRUE, mat_despl );
-    DibujarTrianguloMI();
+    DibujarTrianguloMI(); //
 
     // comprobar y limpiar variable interna de error
     assert( glGetError() == GL_NO_ERROR );
