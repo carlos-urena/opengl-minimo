@@ -35,22 +35,22 @@
 // Constantes y variables globales 
 
 bool 
-    redibujar_ventana   = true ,  // puesto a true por los gestores de eventos cuando cambia el modelo y hay que regenerar la vista 
+    redibujar_ventana   = true ,   // puesto a true por los gestores de eventos cuando cambia el modelo y hay que regenerar la vista 
     terminar_programa   = false ;  // puesto a true en los gestores de eventos cuando hay que terminar el programa
 GLFWwindow *                      
     ventana_glfw        = nullptr; // puntero a la ventana GLFW
 int 
-    ancho_actual        = 512 ,      // ancho actual del framebuffer, en pixels
-    alto_actual         = 512 ;      // alto actual del framebuffer, en pixels
+    ancho_actual        = 512 ,    // ancho actual del framebuffer, en pixels
+    alto_actual         = 512 ;    // alto actual del framebuffer, en pixels
 
 GLint 
-    loc_matriz_transf_coords  ;
+    loc_modelview  ;               // localizador (location) de la matriz modelview en los shaders
 
 GLenum 
-    id_vao = 0 ; // identificador de VAO (vertex array object)
+    id_vao = 0 ;                   // identificador de VAO (vertex array object)
 
 
-const GLfloat mat_ident[] =     // matriz 4x4 identidad
+const GLfloat mat_ident[] =        // matriz 4x4 identidad (para fijar valor inicial de la matriz 'modelview')
     {   1.0, 0.0, 0.0, 0.0, 
         0.0, 1.0, 0.0, 0.0, 
         0.0, 0.0, 1.0, 0.0, 
@@ -69,13 +69,13 @@ const GLfloat mat_ident[] =     // matriz 4x4 identidad
 const char * const fuente_vs = R"glsl(
     #version 120
     
-    uniform mat4 u_matriz_transf_coords; // variable uniform: matriz de transformación de coordenadas
-    varying vec4 v_color ; // variable de salida: color del vértice
+    uniform mat4 u_modelview; // variable uniform: matriz de transformación de coordenadas
+    varying vec4 v_color ;    // variable de salida: color del vértice
 
     void main() 
     {
-        v_color     = gl_Color ; // el color del vértice es el enviado por la aplicación.
-        gl_Position = u_matriz_transf_coords *  gl_Vertex;  // transforma coordenadas   
+        v_color     = gl_Color ;                // el color del vértice es el enviado por la aplicación.
+        gl_Position = u_modelview * gl_Vertex;  // transforma coordenadas   
     }
 )glsl";
 
@@ -85,7 +85,7 @@ const char * const fuente_vs = R"glsl(
 const char * const fuente_fs = R"glsl(
     #version 120
     
-    varying vec4 v_color ; // variable de entrada: color interpolado.
+    varying vec4 v_color ; // variable de entrada: color interpolado en el pixel.
     
     void main() 
     {
@@ -191,6 +191,7 @@ void VisualizarFrame( )
 { 
     using namespace std ;
     
+    // comprobar y limpiar variable interna de error
     assert( glGetError() == GL_NO_ERROR );
 
     // establece la zona visible (toda la ventana)
@@ -198,11 +199,12 @@ void VisualizarFrame( )
 
     // establece la matriz de transformación de coordenadas, 
     // la hace igual a la matriz identidad
-    glUniformMatrix4fv( loc_matriz_transf_coords, 1, GL_TRUE, mat_ident );
+    glUniformMatrix4fv( loc_modelview, 1, GL_TRUE, mat_ident );
     
     // limpiar la ventana
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT ); 
 
+    // habilitar EPO por Z-buffer (test de profundidad)
     glEnable( GL_DEPTH_TEST );
 
     // Dibujar un triángulo en modo diferido 
@@ -217,10 +219,12 @@ void VisualizarFrame( )
         0.0, 0.0, 0.0, 1.0, 
     } ;
 
-
     // Cambiar la matriz de transformación de coordenadas y volver a dibujar
-    glUniformMatrix4fv( loc_matriz_transf_coords, 1, GL_TRUE, mat_despl );
+    glUniformMatrix4fv( loc_modelview, 1, GL_TRUE, mat_despl );
     DibujarTrianguloMI();
+
+    // comprobar y limpiar variable interna de error
+    assert( glGetError() == GL_NO_ERROR );
 
     // esperar a que termine 'glDrawArrays' y entonces presentar el framebuffer actualizado
     glfwSwapBuffers( ventana_glfw );
@@ -402,14 +406,12 @@ void CompilarShaders( )
 
     // leer el identificador ("location") del parámetro uniform "u_matriz_transf_coord"
     // poner esa matriz con un valor igual a la matriz identidad.
-    loc_matriz_transf_coords = glGetUniformLocation( id_prog, "u_matriz_transf_coords" );
-    if ( loc_matriz_transf_coords == -1 )
-    {   cout << "Error: no encuentro variable uniform 'matriz_transf_coords'" << endl ;
+    loc_modelview = glGetUniformLocation( id_prog, "u_modelview" );
+    if ( loc_modelview == -1 )
+    {   cout << "Error: no encuentro variable uniform 'u_modelview'" << endl ;
         exit(1);
     }
     
-    
-
     assert( glGetError() == GL_NO_ERROR );
     cout << "fragment y vertex shaders creados correctamente." << endl ;
    
