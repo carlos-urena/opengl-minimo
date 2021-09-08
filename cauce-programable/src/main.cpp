@@ -44,7 +44,8 @@ int
     alto_actual         = 512 ;    // alto actual del framebuffer, en pixels
 
 GLint 
-    loc_modelview  ;               // localizador (location) de la matriz modelview en los shaders
+    loc_modelview,                 // localizador o identificador (location) de la matriz 'u_modelview'  en los shaders
+    loc_proyeccion ;               // localizador o identificador (location) de la matriz 'u_proyeccion' en los shaders
 
 GLenum 
     id_vao = 0 ;                   // identificador de VAO (vertex array object)
@@ -69,13 +70,14 @@ const GLfloat mat_ident[] =        // matriz 4x4 identidad (para fijar valor ini
 const char * const fuente_vs = R"glsl(
     #version 120
     
-    uniform mat4 u_modelview; // variable uniform: matriz de transformación de coordenadas
-    varying vec4 v_color ;    // variable de salida: color del vértice
+    uniform mat4 u_modelview;  // variable uniform: matriz de transformación de coordenadas
+    uniform mat4 u_proyeccion; // variable uniform: matriz de proyección
+    varying vec4 v_color ;     // variable de salida: color del vértice
 
     void main() 
     {
-        v_color     = gl_Color ;                // el color del vértice es el enviado por la aplicación.
-        gl_Position = u_modelview * gl_Vertex;  // transforma coordenadas   
+        v_color     = gl_Color ;   // color vértice = color enviado por la aplic.
+        gl_Position = u_proyeccion * u_modelview * gl_Vertex;  // transforma coords
     }
 )glsl";
 
@@ -197,9 +199,13 @@ void VisualizarFrame( )
     // establece la zona visible (toda la ventana)
     glViewport( 0, 0, ancho_actual, alto_actual ); 
 
-    // establece la matriz de transformación de coordenadas, 
-    // la hace igual a la matriz identidad
+    // fija la matriz de transformación de coordenadas de los shaders ('u_modelview'), 
+    // (la hace igual a la matriz identidad)
     glUniformMatrix4fv( loc_modelview, 1, GL_TRUE, mat_ident );
+
+    // fija la matriz de proyeccion 'modelview' de los shaders ('u_proyeccion')
+    // (la hace igual a la matriz identidad)
+    glUniformMatrix4fv( loc_proyeccion, 1, GL_TRUE, mat_ident );
     
     // limpiar la ventana
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT ); 
@@ -210,18 +216,18 @@ void VisualizarFrame( )
     // Dibujar un triángulo en modo diferido 
     DibujarTrianguloMD();
 
+    // Cambiar la matriz de transformación de coordenadas (matriz 'u_modelview')
     constexpr float incremento_z = -0.1 ;
-
     const GLfloat mat_despl[] =     // matriz 4x4 desplazamiento
-    {   1.0, 0.0, 0.0, 0.2, 
+    {   1.0, 0.0, 0.0, 0.2,         // (0,2 en X y en Y, -0.1 en Z (más cerca))
         0.0, 1.0, 0.0, 0.2, 
         0.0, 0.0, 1.0, incremento_z, 
         0.0, 0.0, 0.0, 1.0, 
     } ;
-
-    // Cambiar la matriz de transformación de coordenadas y volver a dibujar
     glUniformMatrix4fv( loc_modelview, 1, GL_TRUE, mat_despl );
-    DibujarTrianguloMI(); //
+
+    // dibujar triángulo (desplazado) en modo inmediato.
+    DibujarTrianguloMI(); 
 
     // comprobar y limpiar variable interna de error
     assert( glGetError() == GL_NO_ERROR );
@@ -404,11 +410,19 @@ void CompilarShaders( )
     // activar el programa
     glUseProgram( id_prog );
 
-    // leer el identificador ("location") del parámetro uniform "u_matriz_transf_coord"
+    // leer el identificador ("location") del parámetro uniform "u_modelview"
     // poner esa matriz con un valor igual a la matriz identidad.
     loc_modelview = glGetUniformLocation( id_prog, "u_modelview" );
     if ( loc_modelview == -1 )
     {   cout << "Error: no encuentro variable uniform 'u_modelview'" << endl ;
+        exit(1);
+    }
+
+    // leer el identificador ("location") del parámetro uniform "u_proyeccion"
+    // poner esa matriz con un valor igual a la matriz identidad.
+    loc_proyeccion = glGetUniformLocation( id_prog, "u_proyeccion" );
+    if ( loc_modelview == -1 )
+    {   cout << "Error: no encuentro variable uniform 'u_proyeccion'" << endl ;
         exit(1);
     }
     

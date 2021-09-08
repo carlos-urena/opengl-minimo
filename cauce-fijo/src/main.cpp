@@ -153,28 +153,30 @@ void VisualizarFrame( )
     // limpiar la ventana
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT ); 
 
-    
+    // fijar la matriz de proyección igual a la matriz identidad
+    glMatrixMode( GL_PROJECTION );
+    glLoadIdentity() ;
 
-    // fijar matriz de transformación de coordenadas a la matriz identidad
+    // fijar matriz de transformación de coordenadas 'modelview' igual a la matriz identidad
+    // (dejar activo el modo )
     glMatrixMode( GL_MODELVIEW );
     glLoadIdentity();
-
-    // Dibujar un triángulo en modo diferido 
+    
+    // Dibujar un triángulo en modo diferido con la matriz 'modelview' actual.
     DibujarTrianguloMD();
 
+    // Cambiar la matriz de transformación de coordenadas (matriz 'u_modelview')
     constexpr float incremento_z = -0.1 ;
-
-    const GLfloat mat_despl[] =     // matriz 4x4 desplazamiento
+    const GLfloat mat_despl[] =     // matriz 4x4 desplazamiento: 0.2 en X y en Y, -0.1 en Z
     {   1.0, 0.0, 0.0, 0.2, 
         0.0, 1.0, 0.0, 0.2, 
         0.0, 0.0, 1.0, incremento_z, 
         0.0, 0.0, 0.0, 1.0, 
     } ;
-
-
-    // Cambiar la matriz de transformación de coordenadas y volver a dibujar
-    
+    glMatrixMode( GL_MODELVIEW );
     glMultTransposeMatrixf( mat_despl );
+
+    // Dibujar triángulo (desplazado), en modo inmediato.
     DibujarTrianguloMI();
 
     // esperar a que termine 'glDrawArrays' y entonces presentar el framebuffer actualizado
