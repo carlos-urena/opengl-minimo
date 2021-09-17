@@ -45,17 +45,12 @@ Para compilar y ejecutar, nos situamos en la carpeta `cauce-fijo/build/linux` o 
 
 ## Requisitos y compilación en Windows
 
-En Windows es posible compilar y ejecutar estos programas, para ello será necesario tener instalada la última versión (gratuita) de la herramienta de desarrollo **Visual Studio** de Microsoft. Además de esto, será necesario tener instalados los archivos de cabeceras (`.h`,`.hpp`) y librerías (DLLs) de OpenGL, GLFW (versión 3 o posteriores) y GLEW. Esto último se puede hacer con el gestor de paquetes **NuGet** ([https://www.nuget.org/]), que está incorporado a Visual Studio. Para más detalles se puede consultar las páginas de estos paquetes en el sitio web de NuGet:
+En Windows es posible compilar y ejecutar estos programas, para ello será necesario tener instalada la última versión (gratuita) de la herramienta de desarrollo **Visual Studio** de Microsoft. Además de esto, será necesario tener instalados los archivos de cabeceras (`.h`,`.hpp`) y librerías (DLLs) de OpenGL, GLFW (versión 3 o posteriores) y GLEW. Esto último se puede hacer con el gestor de paquetes **NuGet** (https://www.nuget.org/), que está incorporado a Visual Studio. Para más detalles se puede consultar las páginas de estos paquetes en el sitio web de NuGet:
 
-* OpenGL: paquete `nupengl.core` ([https://www.nuget.org/packages/nupengl.core/])
-* GLEW: paquete `glew` ([https://www.nuget.org/packages/glew/])
-* GLFW: paquete `glfw` ([https://www.nuget.org/packages/glfw/])
+* OpenGL: paquete `nupengl.core` (https://www.nuget.org/packages/nupengl.core/)
+* GLEW: paquete `glew` (https://www.nuget.org/packages/glew/)
+* GLFW: paquete `glfw` (https://www.nuget.org/packages/glfw/)
 
 El código actual de este repositorio no está adaptado a Windows, para ello será necesario adaptar las directivas _include_, aunque no debe haber cambio alguno en las llamadas a OpenGL y el resto de sentencias del programa. En este respositorio no se proporcionan _makefiles_ ni archivos de proyecto para Visual Studio.
 
 Hay que tener en cuenta que en este momento (sept. 2021) no es todavía posible usar WSL2 en Windows para ejecutar archivos ejecutables de Linux que accedan a la GPU o al sistema de ventanas. Sí es posible usar máquinas virtuales ejecutando Linux como invitado sobre Windows como anfitrión, pero se debe configurar el software de virtualización para asegurarnos que el SO invitado tiene acceso a la GPU.
-
-
-
-
-En la cabecera de estos fuentes será necesario hacer adaptacionesen las directivas include
