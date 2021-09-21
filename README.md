@@ -15,7 +15,7 @@ Además se deben instalar los _packages_ **libglew-dev** y **glfw3-dev**, se pue
 
 ```
 sudo apt install libglew-dev
-sudo apt install glfw3-dev
+sudo apt install libglfw3-dev
 ```
 
 ## Requisistos en macOS
