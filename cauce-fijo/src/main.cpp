@@ -43,8 +43,8 @@ int
     ancho_actual        = 512 ,      // ancho actual del framebuffer, en pixels
     alto_actual         = 512 ;      // alto actual del framebuffer, en pixels
 GLenum 
-    id_vao              = 0 ; // identificador de VAO (vertex array object)
-
+    id_vao_no_ind = 0 ,                   // identificador de VAO para MD, secuencia no indexada 
+    id_vao_ind    = 0 ;                   // identificador de VAO para MD, secuencia indexada 
 
 // ---------------------------------------------------------------------------------------------
 // función que se encarga de visualizar un triángulo relleno en modo diferido,
@@ -65,11 +65,11 @@ void DibujarTrianguloMD_NoInd( )
         colores    [ num_verts*3 ] = {  1.0, 0.0, 0.0,   0.0, 1.0, 0.0,  0.0, 0.0, 1.0 } ;
 
     // la primera vez, crear e inicializar el VAO
-    if ( id_vao == 0 )
+    if ( id_vao_no_ind == 0 )
     {
         // crear y activar el VAO
-        glGenVertexArrays( 1, &id_vao ); // crear VAO
-        glBindVertexArray( id_vao );     // activa VAO
+        glGenVertexArrays( 1, &id_vao_no_ind ); // crear VAO
+        glBindVertexArray( id_vao_no_ind );     // activa VAO
      
         // desabilitar atributos que no vamos a usar
         glDisableClientState( GL_NORMAL_ARRAY );   // no usaremos array de normales
@@ -94,7 +94,7 @@ void DibujarTrianguloMD_NoInd( )
         glEnableClientState( GL_COLOR_ARRAY );  // habilita uso de array de colores
     }
     else
-        glBindVertexArray( id_vao );
+        glBindVertexArray( id_vao_no_ind );
 
     // dibujar y desactivar el VAO
     glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
@@ -126,11 +126,11 @@ void DibujarTrianguloMD_Ind( )
         indices[ num_inds ] = { 0,1,2 };
 
     // la primera vez, crear e inicializar el VAO
-    if ( id_vao == 0 )
+    if ( id_vao_ind == 0 )
     {
         // crear y activar el VAO
-        glGenVertexArrays( 1, &id_vao ); // crear VAO
-        glBindVertexArray( id_vao );     // activa VAO
+        glGenVertexArrays( 1, &id_vao_ind ); // crear VAO
+        glBindVertexArray( id_vao_ind );     // activa VAO
      
         // desabilitar atributos que no vamos a usar
         glDisableClientState( GL_NORMAL_ARRAY );   // no usaremos array de normales
@@ -162,7 +162,7 @@ void DibujarTrianguloMD_Ind( )
         glBufferData( GL_ELEMENT_ARRAY_BUFFER, num_inds*sizeof(unsigned), indices, GL_STATIC_DRAW ); // copia indices desde  RAM hacia GPU        
     }
     else
-        glBindVertexArray( id_vao );
+        glBindVertexArray( id_vao_ind );
 
     // dibujar y desactivar el VAO
     glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
@@ -276,8 +276,8 @@ void VisualizarFrame( )
     glLoadIdentity();
     
     // Dibujar un triángulo en modo diferido con la matriz 'modelview' actual.
-    //DibujarTrianguloMD_NoInd();
-    DibujarTrianguloMD_Ind();
+    DibujarTrianguloMD_NoInd();
+    //DibujarTrianguloMD_Ind();
 
     // Cambiar la matriz de transformación de coordenadas (matriz 'u_modelview')
     constexpr float incremento_z = -0.1 ;
@@ -292,7 +292,7 @@ void VisualizarFrame( )
 
     // Dibujar triángulo (desplazado), en modo inmediato.
     //DibujarTrianguloMI_NoInd();
-    DibujarTrianguloMI_Ind();
+    DibujarTrianguloMD_Ind();
 
     // esperar a que termine 'glDrawArrays' y entonces presentar el framebuffer actualizado
     glfwSwapBuffers( ventana_glfw );
