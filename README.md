@@ -23,7 +23,7 @@ sudo apt install libglfw3-dev
 En ordenadores macOS hay que tener instalada la herramienta de desarrollo de **XCode**.
 Este herramienta de desarrollo incorpora el compilador de C++ del proyecto LLVM, así como el _framework_ de **OpenGL**.
 
-### Descarga e instalación de GLFW sin _homebrew_
+### Descarga e instalación de GLFW con _homebrew_
 
 Usando la herramienta **homebrew** para mac, se puede instalar fácilmente la librería **GLFW**, con:
 
