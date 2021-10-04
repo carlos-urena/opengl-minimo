@@ -22,13 +22,19 @@ sudo apt install libglfw3-dev
 
 En ordenadores macOS hay que tener instalada la herramienta de desarrollo de **XCode**.
 Este herramienta de desarrollo incorpora el compilador de C++ del proyecto LLVM, así como el _framework_ de **OpenGL**.
+
+### Descarga e instalación de GLFW sin _homebrew_
+
 Usando la herramienta **homebrew** para mac, se puede instalar fácilmente la librería **GLFW**, con:
 
 ```
 brew install glfw
 ```
 
-Si no se quiere usar **homebrew**, se puede descargar **cmake** para macOS ([https://cmake.org/download/](https://cmake.org/download/)).
+
+### Descarga e instalación de GLFW sin _homebrew_
+
+Si no se quiere usar **homebrew**, se puede descargar y compilar GLFW directamente. Para ello será necesario previamente descargar e instalar **cmake** para macOS ([https://cmake.org/download/](https://cmake.org/download/)). Si todo va bien, la orden `cmake` estará disponible.
 
 Una vez que se tiene disponible la orden `cmake`, se puede descargar el archivo _zip_ de GLFW para macOS del sitio web de GLFW ([http://www.glfw.org/download.html](http://www.glfw.org/download.html)), después se abre el archivo en una carpeta nueva vacía, y al abrirlo se crea un subcarpeta de nombre `glfw-...` (los caracteres concretos en el lugar de los puntos suspensivos dependen de la versión, estos fuentes requieren la versión 3). Finalmente se puede compilar la librería de esta forma:
 
