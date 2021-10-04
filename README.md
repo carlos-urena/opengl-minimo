@@ -25,7 +25,7 @@ Este herramienta de desarrollo incorpora el compilador de C++ del proyecto LLVM,
 
 ### Descarga e instalación de GLFW con _homebrew_
 
-Usando la herramienta **homebrew** para mac, se puede instalar fácilmente la librería **GLFW**, con:
+Usando la herramienta **homebrew** para mac, se puede instalar fácilmente la librería **GLFW**. En caso de no tenerlo disponible, es necesario instalar _homebrew_ ([https://brew.sh/](brew.sh)). Una vez disponible, podemos instalar el paquete `glfw` simplemente con:
 
 ```
 brew install glfw
