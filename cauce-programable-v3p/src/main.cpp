@@ -26,69 +26,6 @@
 #endif
 #endif
 
-constexpr int numErrors = 5 ;
-
-const GLenum errCodes[numErrors] =
-{
-   GL_NO_ERROR ,
-   GL_INVALID_ENUM ,
-   GL_INVALID_VALUE ,
-   GL_INVALID_OPERATION ,
-   //GL_INVALID_FRAMEBUFFER_OPERATION ,  // REVISAR (pq no está definido con glfw?)
-   GL_OUT_OF_MEMORY
-} ;
-
-const char * errDescr[numErrors] =
-{
-   "Error when trying to report an error: no error has been recorded",
-   "An unacceptable value is specified for an enumerated argument",
-   "A numeric argument is out of range",
-   "The specified operation is not allowed in the current state",
-   //"The command is trying to render to or read from the framebuffer while the currently bound framebuffer is not framebuffer complete (i.e. the return value from 'glCheckFramebufferStatus' is not GL_FRAMEBUFFER_COMPLETE)",
-   "There is not enough memory left to execute the command"
-} ;
-
-
-const char * errCodeString[numErrors] =
-{
-   "GL_NO_ERROR",
-   "GL_INVALID_ENUM",
-   "GL_INVALID_VALUE",
-   "GL_INVALID_OPERATION",
-   //"GL_INVALID_FRAMEBUFFER_OPERATION",
-   "GL_OUT_OF_MEMORY"
-} ;
-
-// ---------------------------------------------------------------------
-// devuelve descripción de error dado el código de error opengl
-
-std::string ErrorDescr( GLenum errorCode )
-{
-   int iErr = -1 ;
-   for ( unsigned i = 0 ; i < numErrors ; i++ )
-   {  if ( errCodes[i] == errorCode)
-      {  iErr = i ;
-         break ;
-      }
-   }
-   if ( iErr == -1 )
-      return std::string("Error when trying to report an error: error code is not a valid error code for 'glGetError'") ;
-   return std::string( errDescr[iErr] ) ;
-}
-
-std::string ErrorCodeString( GLenum errorCode )
-{
-   int iErr = -1 ;
-   for ( unsigned i = 0 ; i < numErrors ; i++ )
-   {  if ( errCodes[i] == errorCode)
-      {  iErr = i ;
-         break ;
-      }
-   }
-   if ( iErr == -1 )
-      return std::string("** invalid error code **") ;
-   return std::string( errCodeString[iErr] ) ;
-}
 
 
 // ---------------------------------------------------------------------------------------------
@@ -96,7 +33,8 @@ std::string ErrorCodeString( GLenum errorCode )
 
 constexpr GLuint
     ind_atrib_posiciones = 0,      // índice del atributo de vértice con su posiciones (debe ser el índice 0, siempre)
-    ind_atrib_colores    = 1 ;     // índice del atributo de vértice con su color RGB
+    ind_atrib_colores    = 1,      // índice del atributo de vértice con su color RGB
+    num_atribs           = 2 ;     // número de atributos que gestionan los shaders
 bool 
     redibujar_ventana   = true ,   // puesto a true por los gestores de eventos cuando cambia el modelo y hay que regenerar la vista 
     terminar_programa   = false ;  // puesto a true en los gestores de eventos cuando hay que terminar el programa
@@ -136,16 +74,16 @@ const char * const fuente_vs = R"glsl(
     uniform mat4 u_mat_modelview;  // variable uniform: matriz de transformación de posiciones
     uniform mat4 u_mat_proyeccion; // variable uniform: matriz de proyección
 
-    // Atributos de vértice (variables de entrada distintos para cada vértice)
+    // Atributos de vértice (variables de entrada distintas para cada vértice)
     // (las posiciones de posición siempre deben estar en la 'location' 0)
 
     layout( location = 0 ) in vec3 atrib_posicion ; // atributo 0: posición del vértice
     layout( location = 1 ) in vec3 atrib_color ;    // atributo 1: color RGB del vértice
     
-    // Variables 'varying' de salida (se calculan para cada vértice y se 
-    // entregan interpoladas al fragment shader)
+    // Variables 'varying' (variables de salida, se calculan aquí para cada vértice y se 
+    // entregan interpoladas al fragment shader) - adicionales a 'gl_Position'
     
-    out vec3  var_color ; // color RGB del vértice (el mismo que proporciona la aplic.)
+    out vec3 var_color ; // color RGB del vértice (el mismo que proporciona la aplic.)
 
     // función principal que se ejecuta una vez por vértice
     void main() 
@@ -159,6 +97,7 @@ const char * const fuente_vs = R"glsl(
     }
 )glsl";
 
+// ------------------------------------------------------------------------------------------------------
 // Cadena con el código fuente para el fragment shader sencillo: se invoca una vez por cada pixel.
 // su función es escribir en 'gl_FragColor' el color del pixel 
 
@@ -171,7 +110,7 @@ const char * const fuente_fs = R"glsl(
     in vec3 var_color ; // color interpolado en el pixel.
 
     // dato de salida (color del pixel)
-    layout(location = 0) out vec4 out_color_fragmento ; // color que se calcula como resultado final de este shader en 'main'
+    layout( location = 0 ) out vec4 out_color_fragmento ; // color que se calcula como resultado final de este shader en 'main'
     
     // función principal que se ejecuta una vez por cada pixel en el cual se 
     // proyecta una primitiva, calcula 'out_color_fragmento'
@@ -184,25 +123,71 @@ const char * const fuente_fs = R"glsl(
 
 
 // ------------------------------------------------------------------------------------------------------
-// activa una tabla de una atributo de vértice con flotantes 
+// Crea un VBO con una tabla de atributos de vértice, y fija el puntero a la tabla
+//
+// ind_atrib     = índice de atríbuto , 0 --> posiciones, (resto depende del shader)
+// num_vals_vert = numero de valores por vértice, típicamente 2,3 o 4.
+// tipo_vals     = tipo de los valores (GL_FLOAT o GL_DOUBLE)
+// num_verts     = número de vértices (>0)
+// datos         = puntero a los valores
+//
+// Devuelve el identificador (nombre) del VBO
 
-void ActivarTablaFloats( GLuint ind_atrib, GLuint num_verts, GLuint num_vals_tupla, const GLvoid * datos )
+GLenum CrearVBOAtrib( GLuint ind_atrib, GLint num_vals_vert, GLenum tipo_vals, 
+                      GLuint num_verts, const void * datos )
 {
-    assert( 0 < ind_atrib && ind_atrib < 2);
-    GLenum  id_vbo ;
+    assert( glGetError() == GL_NO_ERROR );
+    assert( 0 <= ind_atrib && ind_atrib <= num_atribs );
+    assert( tipo_vals == GL_FLOAT || tipo_vals == GL_DOUBLE );
+
+    const GLint      bytes_x_valor   = (tipo_vals == GL_FLOAT) ? sizeof(float) : sizeof(double) ; // bytes por valor
+    const GLsizeiptr tam_total_bytes = num_verts*num_vals_vert*bytes_x_valor ; // tamaño total de la tabla en bytes
+
+    GLenum id_vbo = 0 ;
     glGenBuffers( 1, &id_vbo );               // crea VBO verts.
     glBindBuffer( GL_ARRAY_BUFFER, id_vbo );  // activa VBO verts.                            
-    glBufferData( GL_ARRAY_BUFFER, num_vals_tupla*num_verts*sizeof(float), datos, GL_STATIC_DRAW ); // copia
-    glVertexAttribPointer( ind_atrib, num_vals_tupla, GL_FLOAT, GL_FALSE, 0, datos );  // indica puntero a array de posiciones
+    glBufferData( GL_ARRAY_BUFFER, tam_total_bytes, datos, GL_STATIC_DRAW ); // copia App --> GPU
+    glVertexAttribPointer( ind_atrib, num_vals_vert, GL_FLOAT, GL_FALSE, 0, 0 );  // fija puntero
     glBindBuffer( GL_ARRAY_BUFFER, 0 );
     glEnableVertexAttribArray( ind_atrib ); // habilita uso de array de posiciones
+
     assert( glGetError() == GL_NO_ERROR );
+    return id_vbo ;
 }
+
+// ---------------------------------------------------------------------------------------------
+// crear un VBO de índices, lo deja activado en el target 'GL_ELEMENT_ARRAY_BUFFER'
+// (queda activado en el 'target' GL_ELEMENT_ARRAY_BUFFER)
+//
+// tipo_vals == tipo de los índices, (GL_UNSIGNED_BYTE, GL_UNSIGNED_SHORT, GL_UNSIGNED_INT)
+// num_inds  == número total de índices en la tabla
+//
+// devuelve el identificador de VBO
+
+GLenum CrearVBOIndices( GLenum tipo_vals, GLint num_inds, const void * indices )
+{
+    assert( tipo_vals == GL_UNSIGNED_BYTE || tipo_vals == GL_UNSIGNED_SHORT || tipo_vals == GL_UNSIGNED_INT );
+
+    const GLint bytes_x_ind = (tipo_vals == GL_UNSIGNED_BYTE ) ? sizeof(char) : 
+                              (tipo_vals == GL_UNSIGNED_SHORT) ? sizeof(unsigned short) :
+                                                                 sizeof(unsigned int); // bytes por valor
+
+    const GLsizeiptr tam_total_bytes = num_inds*bytes_x_ind ; // tamaño total de la tabla en bytes
+
+    GLenum id_vbo ;
+    glGenBuffers( 1, &id_vbo ); // crea VBO indices 
+    glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, id_vbo ); // activa VBO de índices (lo deja 'binded')
+    glBufferData( GL_ELEMENT_ARRAY_BUFFER, tam_total_bytes, indices, GL_STATIC_DRAW ); // copia App --> GPU
+
+    assert( glGetError() == GL_NO_ERROR );
+    return id_vbo ;
+}
+
 // ---------------------------------------------------------------------------------------------
 // función que se encarga de visualizar un triángulo relleno en modo diferido,
 // no indexado, con 'glDrawArrays'
 
-void DibujarTriangulo_MD_NoInd( ) 
+void DibujarTriangulo_NoInd( ) 
 {
      assert( glGetError() == GL_NO_ERROR );
 
@@ -222,28 +207,10 @@ void DibujarTriangulo_MD_NoInd( )
         // crear y activar el VAO
         glGenVertexArrays( 1, &id_vao_no_ind ); // crear VAO
         glBindVertexArray( id_vao_no_ind );     // activa VAO
-        assert( glGetError() == GL_NO_ERROR );
-
-        // crear el VBO de posiciones,  fijar puntero y lo habilita 
-        GLenum  id_vbo_posiciones ;
-        glGenBuffers( 1, &id_vbo_posiciones );               // crea VBO verts.
-        glBindBuffer( GL_ARRAY_BUFFER, id_vbo_posiciones );  // activa VBO verts.                            
-        glBufferData( GL_ARRAY_BUFFER, 2*num_verts*sizeof(float), posiciones, GL_STATIC_DRAW ); // copia
-        glVertexAttribPointer( ind_atrib_posiciones, 2, GL_FLOAT, GL_FALSE, 0, 0 );  // indica puntero a array de posiciones
-        glEnableVertexAttribArray( ind_atrib_posiciones ); // habilita uso de array de posiciones
-        glBindBuffer( GL_ARRAY_BUFFER, 0 );
         
-        assert( glGetError() == GL_NO_ERROR );
-
-        // crear el VBO de colores, fijar puntero y habilitar
-        GLenum id_vbo_colores  ;
-        glGenBuffers( 1, &id_vbo_colores );  // crea VBO colores
-        glBindBuffer( GL_ARRAY_BUFFER, id_vbo_colores );   // activa VBO colores                           
-        glBufferData( GL_ARRAY_BUFFER, 3*num_verts*sizeof(float), colores, GL_STATIC_DRAW ); // copia
-        glVertexAttribPointer(  ind_atrib_colores, 3, GL_FLOAT, GL_FALSE, 0, 0 );    // indica puntero a array de colores
-        glEnableVertexAttribArray( ind_atrib_colores ) ;  // habilita uso de array de colores
-        glBindBuffer( GL_ARRAY_BUFFER, 0 );
-        assert( glGetError() == GL_NO_ERROR );
+        // crear VBOs en este VAO
+        CrearVBOAtrib( ind_atrib_posiciones, 2, GL_FLOAT, num_verts, posiciones );
+        CrearVBOAtrib( ind_atrib_colores,    3, GL_FLOAT, num_verts, colores    );
     }
     else
         glBindVertexArray( id_vao_no_ind );
@@ -261,22 +228,21 @@ void DibujarTriangulo_MD_NoInd( )
 // función que se encarga de visualizar un triángulo relleno en modo diferido,
 // indexado, con 'glDrawElements'
 
-void DibujarTriangulo_MD_Ind( ) 
+void DibujarTriangulo_Ind( ) 
 {
-     assert( glGetError() == GL_NO_ERROR );
+    assert( glGetError() == GL_NO_ERROR );
 
     // número de vértices e índices que se van a dibujar
     constexpr unsigned
         num_verts = 3,
         num_inds  = 3 ;
 
-
      // tablas de posiciones y colores de vértices (posiciones en 2D, con Z=0) 
     const GLfloat 
-        posiciones[ num_verts*2 ] = {  -0.8, -0.8,      +0.8, -0.8,     0.0, 0.8      },
-        colores    [ num_verts*3 ] = {  1.0, 0.0, 0.0,   0.0, 1.0, 0.0,  0.0, 0.0, 1.0 } ;
+        posiciones[ num_verts*2 ] = {  -0.8, -0.8,      +0.8, -0.8,     0.0, +0.8      },
+        colores   [ num_verts*3 ] = {  1.0, 0.0, 0.0,   0.0, 1.0, 0.0,  0.0, 0.0, 1.0 } ;
     const GLuint 
-        indices[ num_inds ] = { 0,1,2 };
+        indices   [ num_inds    ] = { 0, 1, 2 };
 
     // la primera vez, crear e inicializar el VAO
     if ( id_vao_ind == 0 )
@@ -284,45 +250,20 @@ void DibujarTriangulo_MD_Ind( )
         // crear y activar el VAO
         glGenVertexArrays( 1, &id_vao_ind ); // crear VAO
         glBindVertexArray( id_vao_ind );     // activa VAO
-     
-        // crear el VBO de posiciones,  fijar puntero y lo habilita 
-        GLenum  id_vbo_posiciones ;
-        glGenBuffers( 1, &id_vbo_posiciones );               // crea VBO verts.
-        glBindBuffer( GL_ARRAY_BUFFER, id_vbo_posiciones );  // activa VBO verts.                            
-        glBufferData( GL_ARRAY_BUFFER, 2*num_verts*sizeof(float), posiciones, GL_STATIC_DRAW ); // copia
-        glVertexAttribPointer( ind_atrib_posiciones, 2, GL_FLOAT, GL_FALSE, 0, 0 );  // indica puntero a array de posiciones
-        glBindBuffer( GL_ARRAY_BUFFER, 0 );
-        glEnableVertexAttribArray( ind_atrib_posiciones ); // habilita uso de array de posiciones
-        assert( glGetError() == GL_NO_ERROR );
 
-        // crear el VBO de colores, fijar puntero y habilitar
-        GLenum id_vbo_colores  ;
-        glGenBuffers( 1, &id_vbo_colores );  // crea VBO colores
-        glBindBuffer( GL_ARRAY_BUFFER, id_vbo_colores );   // activa VBO colores                           
-        glBufferData( GL_ARRAY_BUFFER, 3*num_verts*sizeof(float), colores, GL_STATIC_DRAW ); // copia
-        glVertexAttribPointer(  ind_atrib_colores, 3, GL_FLOAT, GL_FALSE, 0, 0 );    // indica puntero a array de colores
-        glBindBuffer( GL_ARRAY_BUFFER, 0 );
-        glEnableVertexAttribArray( ind_atrib_colores ) ;  // habilita uso de array de colores
-        assert( glGetError() == GL_NO_ERROR );
+        // crear VBOs en este VAO
+        CrearVBOAtrib( ind_atrib_posiciones, 2, GL_FLOAT, num_verts, posiciones );
+        CrearVBOAtrib( ind_atrib_colores,    3, GL_FLOAT, num_verts, colores    );
 
         // crear el VBO de índices, popular VBO 
-        // (queda activado en el 'target' GL_ELEMENT_ARRAY_BUFFER)
-        GLenum id_vbo_indices ;
-        glGenBuffers( 1, &id_vbo_indices ); // crea VBO indices 
-        glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, id_vbo_indices );// activa VBO de índices y lo deja activado en el target 'GL_ELEMENT_ARRAY_BUFFER', dentro del VBO
-        glBufferData( GL_ELEMENT_ARRAY_BUFFER, num_inds*sizeof(unsigned), indices, GL_STATIC_DRAW ); // copia indices desde  RAM hacia GPU        
+        CrearVBOIndices( GL_UNSIGNED_INT, num_inds, indices );
     }
     else
         glBindVertexArray( id_vao_ind );
 
-    assert( glGetError() == GL_NO_ERROR );
-
     // dibujar y desactivar el VAO
     glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-    assert( glGetError() == GL_NO_ERROR );
     glDrawElements( GL_TRIANGLES, num_inds, GL_UNSIGNED_INT, 0 );
-    assert( glGetError() == GL_NO_ERROR );
-    glBindVertexArray( 0 );
     assert( glGetError() == GL_NO_ERROR );
 }
 
@@ -355,7 +296,7 @@ void VisualizarFrame( )
     glEnable( GL_DEPTH_TEST );
 
     // Dibujar un triángulo en modo diferido 
-    DibujarTriangulo_MI_NoInd();
+    DibujarTriangulo_NoInd();
 
     // Cambiar la matriz de transformación de posiciones (matriz 'u_modelview')
     constexpr float incremento_z = -0.1 ;
@@ -368,7 +309,7 @@ void VisualizarFrame( )
     glUniformMatrix4fv( loc_mat_modelview, 1, GL_TRUE, mat_despl );
 
     // dibujar triángulo (desplazado) en modo inmediato.
-    DibujarTriangulo_MI_Ind();     // indexado 
+    DibujarTriangulo_Ind();     // indexado 
 
     // comprobar y limpiar variable interna de error
     assert( glGetError() == GL_NO_ERROR );
@@ -455,7 +396,7 @@ void InicializaGLFW( int argc, char * argv[] )
     glfwSetErrorCallback( ErrorGLFW );
     
     // crear la ventana (var. global ventana_glfw), activar el rendering context 
-    ventana_glfw = glfwCreateWindow( 512, 512, "IG ejemplo mínimo", nullptr, nullptr ); 
+    ventana_glfw = glfwCreateWindow( 512, 512, "IG ejemplo mínimo (OpenGL 3+)", nullptr, nullptr ); 
     glfwMakeContextCurrent( ventana_glfw ); // necesario para OpenGL
 
     // leer y guardar las dimensiones del framebuffer en pixels
