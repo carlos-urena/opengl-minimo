@@ -26,6 +26,70 @@
 #endif
 #endif
 
+constexpr int numErrors = 5 ;
+
+const GLenum errCodes[numErrors] =
+{
+   GL_NO_ERROR ,
+   GL_INVALID_ENUM ,
+   GL_INVALID_VALUE ,
+   GL_INVALID_OPERATION ,
+   //GL_INVALID_FRAMEBUFFER_OPERATION ,  // REVISAR (pq no está definido con glfw?)
+   GL_OUT_OF_MEMORY
+} ;
+
+const char * errDescr[numErrors] =
+{
+   "Error when trying to report an error: no error has been recorded",
+   "An unacceptable value is specified for an enumerated argument",
+   "A numeric argument is out of range",
+   "The specified operation is not allowed in the current state",
+   //"The command is trying to render to or read from the framebuffer while the currently bound framebuffer is not framebuffer complete (i.e. the return value from 'glCheckFramebufferStatus' is not GL_FRAMEBUFFER_COMPLETE)",
+   "There is not enough memory left to execute the command"
+} ;
+
+
+const char * errCodeString[numErrors] =
+{
+   "GL_NO_ERROR",
+   "GL_INVALID_ENUM",
+   "GL_INVALID_VALUE",
+   "GL_INVALID_OPERATION",
+   //"GL_INVALID_FRAMEBUFFER_OPERATION",
+   "GL_OUT_OF_MEMORY"
+} ;
+
+// ---------------------------------------------------------------------
+// devuelve descripción de error dado el código de error opengl
+
+std::string ErrorDescr( GLenum errorCode )
+{
+   int iErr = -1 ;
+   for ( unsigned i = 0 ; i < numErrors ; i++ )
+   {  if ( errCodes[i] == errorCode)
+      {  iErr = i ;
+         break ;
+      }
+   }
+   if ( iErr == -1 )
+      return std::string("Error when trying to report an error: error code is not a valid error code for 'glGetError'") ;
+   return std::string( errDescr[iErr] ) ;
+}
+
+std::string ErrorCodeString( GLenum errorCode )
+{
+   int iErr = -1 ;
+   for ( unsigned i = 0 ; i < numErrors ; i++ )
+   {  if ( errCodes[i] == errorCode)
+      {  iErr = i ;
+         break ;
+      }
+   }
+   if ( iErr == -1 )
+      return std::string("** invalid error code **") ;
+   return std::string( errCodeString[iErr] ) ;
+}
+
 
 // ---------------------------------------------------------------------------------------------
 // Constantes y variables globales 
@@ -132,22 +196,35 @@ void DibujarTriangulo_MI_NoInd( )
     // posiciones y colores de los vértices
     const GLfloat 
         posiciones[ num_verts*2 ] = {  -0.6, -0.6,      +0.6, -0.6,     0.0, 0.6      },
-        colores    [ num_verts*3 ] = {  1.0, 1.0, 0.0,   1.0, 0.0, 1.0,  0.0, 1.0, 1.0 } ;
+        colores   [ num_verts*3 ] = {  1.0, 1.0, 0.0,   1.0, 0.0, 1.0,  0.0, 1.0, 1.0 } ;
 
     // activar el VAO por defecto (es el que se usa siempre para modo inmediato)
     glBindVertexArray( 0 ) ;
+    assert( glGetError() == GL_NO_ERROR );
+
     
     // fijar habilitar puntero a array de posiciones
     glVertexAttribPointer( ind_atrib_posiciones, 2, GL_FLOAT, GL_FALSE, 0, posiciones );  
+    const GLuint ec = glGetError();
+    if ( ec != GL_NO_ERROR )
+    {
+        using namespace std ;
+        cout << "error code: " << ErrorCodeString(ec) << endl ;
+        cout << "descr.      " << ErrorDescr(ec) << endl ;
+        exit(1);
+    }
     glEnableVertexAttribArray( ind_atrib_posiciones );          // habilita uso del puntero al array de posiciones
+    assert( glGetError() == GL_NO_ERROR );
 
     // fijar y habilitar puntero a array de colores
     glVertexAttribPointer( ind_atrib_colores, 3, GL_FLOAT, GL_FALSE, 0, colores );  // puntero colores
     glEnableVertexAttribArray( ind_atrib_colores );           // habilita uso del puntero al array de colores
-    
+    assert( glGetError() == GL_NO_ERROR );
+
     // configurar el modo y dibujar
     glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
     glDrawArrays( GL_TRIANGLES, 0, num_verts );
+    assert( glGetError() == GL_NO_ERROR );
 
     // deshabilitar punteros (queda habilitado el VAO 0)
     glDisableVertexAttribArray( ind_atrib_posiciones );
@@ -385,7 +462,7 @@ void VisualizarFrame( )
     glEnable( GL_DEPTH_TEST );
 
     // Dibujar un triángulo en modo diferido 
-    DibujarTriangulo_MD_NoInd();
+    DibujarTriangulo_MI_NoInd();
 
     // Cambiar la matriz de transformación de posiciones (matriz 'u_modelview')
     constexpr float incremento_z = -0.1 ;
@@ -398,7 +475,7 @@ void VisualizarFrame( )
     glUniformMatrix4fv( loc_mat_modelview, 1, GL_TRUE, mat_despl );
 
     // dibujar triángulo (desplazado) en modo inmediato.
-    DibujarTriangulo_MD_Ind();     // indexado 
+    DibujarTriangulo_MI_Ind();     // indexado 
 
     // comprobar y limpiar variable interna de error
     assert( glGetError() == GL_NO_ERROR );
