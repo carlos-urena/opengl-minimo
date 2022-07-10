@@ -13,16 +13,12 @@
 // Includes y definiciones específicos en Linux
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include <GL/glu.h> 
 #else 
 #ifdef __APPLE__
 //------------------------------------------------
 // Includes y definiciones específicos en macOS
-#include <OpenGL/gl.h>
-#include <OpenGL/glu.h>
+#include <OpenGL/gl3.h>
 #include <GLFW/glfw3.h>  
-#define glGenVertexArrays  glGenVertexArraysAPPLE
-#define glBindVertexArray  glBindVertexArrayAPPLE
 #else 
 // ------------------------------------------------
 // Emitir error por sistema operativo no soportado
@@ -34,6 +30,9 @@
 // ---------------------------------------------------------------------------------------------
 // Constantes y variables globales 
 
+constexpr GLuint
+    ind_atrib_posiciones = 0,      // índice del atributo de vértice con su posiciones (debe ser el índice 0, siempre)
+    ind_atrib_colores    = 1 ;     // índice del atributo de vértice con su color RGB
 bool 
     redibujar_ventana   = true ,   // puesto a true por los gestores de eventos cuando cambia el modelo y hay que regenerar la vista 
     terminar_programa   = false ;  // puesto a true en los gestores de eventos cuando hay que terminar el programa
@@ -42,64 +41,194 @@ GLFWwindow *
 int 
     ancho_actual        = 512 ,    // ancho actual del framebuffer, en pixels
     alto_actual         = 512 ;    // alto actual del framebuffer, en pixels
-
 GLint 
-    loc_modelview,                 // localizador o identificador (location) de la matriz 'u_modelview'  en los shaders
-    loc_proyeccion ;               // localizador o identificador (location) de la matriz 'u_proyeccion' en los shaders
-
+    loc_mat_modelview,             // localizador o identificador (location) de la matriz 'u_modelview'  en los shaders
+    loc_mat_proyeccion ;           // localizador o identificador (location) de la matriz 'u_proyeccion' en los shaders
 GLenum 
     id_vao = 0 ;                   // identificador de VAO (vertex array object)
 
 
-const GLfloat mat_ident[] =        // matriz 4x4 identidad (para fijar valor inicial de la matriz 'modelview')
+constexpr GLfloat mat_ident[] =    // matriz 4x4 identidad (para fijar valor inicial de las matrices)
     {   1.0, 0.0, 0.0, 0.0, 
         0.0, 1.0, 0.0, 0.0, 
         0.0, 0.0, 1.0, 0.0, 
         0.0, 0.0, 0.0, 1.0, 
     } ;
 
-
 // ---------------------------------------------------------------------------------------------
 // Fuentes para el vertex shader y el fragment shader 
 
-// fuente para el vertex shader sencillo, se invoca una vez por cada vértice. 
-// su función es escribir en 'gl_Position' las coordenadas del vértice 
-// además, puede escribir otros atributos del vértice en variables 'varying'
-// (en este caso escribe el color en 'v_color')
+// Cadena con el código fuente para el vertex shader sencillo, se invoca una vez por cada vértice. 
+// su función es escribir en 'gl_Position' las posiciones del vértice 
+// además, puede escribir otros atributos del vértice en variables 'out' (tambíen llamadas 'varying')
+// (en este caso escribe el color en 'var_color')
 
 const char * const fuente_vs = R"glsl(
-    #version 120
+    #version 330 core
     
-    uniform mat4 u_modelview;  // variable uniform: matriz de transformación de coordenadas
-    uniform mat4 u_proyeccion; // variable uniform: matriz de proyección
-    varying vec4 v_color ;     // variable de salida: color del vértice
+    // Parámetros uniform (variables de entrada iguales para todos los vértices en cada primitiva)
 
+    uniform mat4 u_mat_modelview;  // variable uniform: matriz de transformación de posiciones
+    uniform mat4 u_mat_proyeccion; // variable uniform: matriz de proyección
+
+    // Atributos de vértice (variables de entrada distintos para cada vértice)
+    // (las posiciones de posición siempre deben estar en la 'location' 0)
+
+    layout( location = 0 ) in vec3 atrib_posicion ; // atributo 0: posición del vértice
+    layout( location = 1 ) in vec3 atrib_color ;    // atributo 1: color RGB del vértice
+    
+    // Variables 'varying' de salida (se calculan para cada vértice y se 
+    // entregan interpoladas al fragment shader)
+    
+    out vec3  var_color ; // color RGB del vértice (el mismo que proporciona la aplic.)
+
+    // función principal que se ejecuta una vez por vértice
     void main() 
     {
-        v_color     = gl_Color ;   // color vértice = color enviado por la aplic.
-        gl_Position = u_proyeccion * u_modelview * gl_Vertex;  // transforma coords
+        // copiamos color recibido en el color de salida, tal cual
+        var_color = atrib_color ;
+
+        // calcular las posiciones del vértice en posiciones de mundo y escribimos 'gl_Position'
+        // (se calcula multiplicando las cordenadas por la matrices 'modelview' y 'projection')
+        gl_Position = u_mat_proyeccion * u_mat_modelview * vec4( atrib_posicion, 1);  
     }
 )glsl";
 
-// fuente para el fragment shader sencillo: se invoca una vez por cada pixel.
+// Cadena con el código fuente para el fragment shader sencillo: se invoca una vez por cada pixel.
 // su función es escribir en 'gl_FragColor' el color del pixel 
 
 const char * const fuente_fs = R"glsl(
-    #version 120
+    #version 330 core
     
-    varying vec4 v_color ; // variable de entrada: color interpolado en el pixel.
+    // datos de entrada ('in'), valores interpolados, a partir de las variables 
+    // 'varying' calculadas como salida del vertex shader (se deben corresponder en nombre y tipo):
+
+    in vec3 var_color ; // color interpolado en el pixel.
+
+    // dato de salida (color del pixel)
+    layout(location = 0) out vec4 out_color_fragmento ; // color que se calcula como resultado final de este shader en 'main'
     
+    // función principal que se ejecuta una vez por cada pixel en el cual se 
+    // proyecta una primitiva, calcula 'out_color_fragmento'
+
     void main() 
     {
-        gl_FragColor = v_color ; // el color del pixel es el color interpolado
+        out_color_fragmento = vec4( var_color, 1 ) ; // el color del pixel es el color interpolado
     }
 )glsl";
 
+// ---------------------------------------------------------------------------------------------
+// función que se encarga de visualizar un triángulo relleno en modo inmediato,
+// no indexado (con 'glDrawArrays')
+
+void DibujarTriangulo_MI_NoInd( ) 
+{   
+    assert( glGetError() == GL_NO_ERROR );
+
+    // número de vértices que se van a dibujar
+    constexpr unsigned num_verts = 3 ;
+
+    // posiciones y colores de los vértices
+    const GLfloat 
+        posiciones[ num_verts*2 ] = {  -0.6, -0.6,      +0.6, -0.6,     0.0, 0.6      },
+        colores    [ num_verts*3 ] = {  1.0, 1.0, 0.0,   1.0, 0.0, 1.0,  0.0, 1.0, 1.0 } ;
+
+    // activar el VAO por defecto (es el que se usa siempre para modo inmediato)
+    glBindVertexArray( 0 ) ;
+    
+    // fijar habilitar puntero a array de posiciones
+    glVertexAttribPointer( ind_atrib_posiciones, 2, GL_FLOAT, GL_FALSE, 0, posiciones );  
+    glEnableVertexAttribArray( ind_atrib_posiciones );          // habilita uso del puntero al array de posiciones
+
+    // fijar y habilitar puntero a array de colores
+    glVertexAttribPointer( ind_atrib_colores, 3, GL_FLOAT, GL_FALSE, 0, colores );  // puntero colores
+    glEnableVertexAttribArray( ind_atrib_colores );           // habilita uso del puntero al array de colores
+    
+    // configurar el modo y dibujar
+    glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+    glDrawArrays( GL_TRIANGLES, 0, num_verts );
+
+    // deshabilitar punteros (queda habilitado el VAO 0)
+    glDisableVertexAttribArray( ind_atrib_posiciones );
+    glDisableVertexAttribArray( ind_atrib_colores );
+
+    assert( glGetError() == GL_NO_ERROR );
+}
+
+// ---------------------------------------------------------------------------------------------
+// función que se encarga de visualizar un triángulo relleno en modo inmediato,
+// indexado (con 'glDrawElements')
+
+void DibujarTriangulo_MI_Ind( ) 
+{
+     assert( glGetError() == GL_NO_ERROR );
+
+    // número de vértices e índices que se van a dibujar
+    constexpr unsigned
+        num_verts = 3 ,
+        num_inds  = 3 ;
+        
+    // posiciones y colores de los vértices
+    const GLfloat 
+        posiciones[ num_verts*2 ] = {  -0.6, -0.6,      +0.6, -0.6,     0.0, 0.6      },
+        colores   [ num_verts*3 ] = {  1.0, 1.0, 0.0,   1.0, 0.0, 1.0,  0.0, 1.0, 1.0 } ;
+    const GLuint 
+        indices[ num_inds ] = { 0,1,2 };
+
+     // activar el VAO por defecto (es el que se usa siempre para modo inmediato)
+    glBindVertexArray( 0 ) ;
+   
+    // fijar habilitar puntero a array de posiciones
+    glVertexAttribPointer( ind_atrib_posiciones, 2, GL_FLOAT, GL_FALSE, 0, posiciones );  
+    const GLenum err = glGetError();
+    if ( err != GL_NO_ERROR )
+        {
+            using namespace std ;
+            if ( err == GL_INVALID_OPERATION )
+                cout << "invalid operation en glVertexAttribPointer en M.I." << endl ;
+            else 
+                cout << "Otro error..." << endl ;
+            exit(1);
+        }
+    glEnableVertexAttribArray( ind_atrib_posiciones );          // habilita uso del puntero al array de posiciones
+    assert( glGetError() == GL_NO_ERROR );
+
+    // fijar y habilitar puntero a array de colores
+    glVertexAttribPointer( ind_atrib_colores, 3, GL_FLOAT, GL_FALSE, 0, colores );  // puntero colores
+    glEnableVertexAttribArray( ind_atrib_colores );           // habilita uso del puntero al array de colores
+    assert( glGetError() == GL_NO_ERROR );
+
+    // configurar el modo y dibujar, al dibujar especificar donde está el array de índices
+    glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+    glDrawElements( GL_TRIANGLES, num_inds, GL_UNSIGNED_INT, indices );
+
+    // deshabilitar punteros (queda habilitado el VAO 0)
+    glDisableVertexAttribArray( ind_atrib_posiciones );
+    glDisableVertexAttribArray( ind_atrib_colores );
+
+    assert( glGetError() == GL_NO_ERROR );
+}
+
+// ------------------------------------------------------------------------------------------------------
+// activa una tabla de flotantes en modo diferido (la tabla tiene los datos de algún atributo de vértice)
+
+void ActivarTabla_MD_f( GLuint ind_atrib, GLuint num_verts, GLuint num_vals_tupla, const GLvoid * datos )
+{
+    assert( 0 < ind_atrib && ind_atrib < 2);
+    GLenum  id_vbo ;
+    glGenBuffers( 1, &id_vbo );               // crea VBO verts.
+    glBindBuffer( GL_ARRAY_BUFFER, id_vbo );  // activa VBO verts.                            
+    glBufferData( GL_ARRAY_BUFFER, num_vals_tupla*num_verts*sizeof(float), datos, GL_STATIC_DRAW ); // copia
+    glVertexAttribPointer( ind_atrib, num_vals_tupla, GL_FLOAT, GL_FALSE, 0, datos );  // indica puntero a array de posiciones
+    glBindBuffer( GL_ARRAY_BUFFER, 0 );
+    glEnableVertexAttribArray( ind_atrib ); // habilita uso de array de posiciones
+    assert( glGetError() == GL_NO_ERROR );
+}
 // ---------------------------------------------------------------------------------------------
 // función que se encarga de visualizar un triángulo relleno en modo diferido,
 // no indexado, con 'glDrawArrays'
 
-void DibujarTrianguloMD_NoInd( ) 
+void DibujarTriangulo_MD_NoInd( ) 
 {
      assert( glGetError() == GL_NO_ERROR );
 
@@ -108,10 +237,10 @@ void DibujarTrianguloMD_NoInd( )
         num_verts = 3 ;
 
 
-     // tablas de coordenadas y colores de vértices (coordenadas en 2D, con Z=0) 
+     // tablas de posiciones y colores de vértices (posiciones en 2D, con Z=0) 
     const GLfloat 
-        coordenadas[ num_verts*2 ] = {  -0.8, -0.8,      +0.8, -0.8,     0.0, 0.8      },
-        colores    [ num_verts*3 ] = {  1.0, 0.0, 0.0,   0.0, 1.0, 0.0,  0.0, 0.0, 1.0 } ;
+        posiciones[ num_verts*2 ] = {  -0.8, -0.8,      +0.8, -0.8,     0.0, 0.8      },
+        colores   [ num_verts*3 ] = {  1.0, 0.0, 0.0,   0.0, 1.0, 0.0,  0.0, 0.0, 1.0 } ;
 
     // la primera vez, crear e inicializar el VAO
     if ( id_vao == 0 )
@@ -119,35 +248,34 @@ void DibujarTrianguloMD_NoInd( )
         // crear y activar el VAO
         glGenVertexArrays( 1, &id_vao ); // crear VAO
         glBindVertexArray( id_vao );     // activa VAO
-     
-        // desabilitar atributos que no vamos a usar
-        glDisableClientState( GL_NORMAL_ARRAY );   // no usaremos array de normales
-        glDisableClientState( GL_TEXTURE_COORD_ARRAY ); // no usaremos array de coordenadas de textura
+        assert( glGetError() == GL_NO_ERROR );
 
-        // crear el VBO de coordenadas,  fijar puntero y lo habilita 
-        GLenum  id_vbo_coordenadas ;
-        glGenBuffers( 1, &id_vbo_coordenadas );               // crea VBO verts.
-        glBindBuffer( GL_ARRAY_BUFFER, id_vbo_coordenadas );  // activa VBO verts.                            
-        glBufferData( GL_ARRAY_BUFFER, 2*num_verts*sizeof(float), coordenadas, GL_STATIC_DRAW ); // copia
-        glVertexPointer( 2, GL_FLOAT, 0, 0 );  // indica puntero a array de coordenadas
+        // crear el VBO de posiciones,  fijar puntero y lo habilita 
+        GLenum  id_vbo_posiciones ;
+        glGenBuffers( 1, &id_vbo_posiciones );               // crea VBO verts.
+        glBindBuffer( GL_ARRAY_BUFFER, id_vbo_posiciones );  // activa VBO verts.                            
+        glBufferData( GL_ARRAY_BUFFER, 2*num_verts*sizeof(float), posiciones, GL_STATIC_DRAW ); // copia
+        glVertexAttribPointer( ind_atrib_posiciones, 2, GL_FLOAT, GL_FALSE, 0, posiciones );  // indica puntero a array de posiciones
         glBindBuffer( GL_ARRAY_BUFFER, 0 );
-        glEnableClientState( GL_VERTEX_ARRAY ); // habilita uso de array de coordenadas
+        glEnableVertexAttribArray( ind_atrib_posiciones ); // habilita uso de array de posiciones
+        assert( glGetError() == GL_NO_ERROR );
 
         // crear el VBO de colores, fijar puntero y habilitar
         GLenum id_vbo_colores  ;
         glGenBuffers( 1, &id_vbo_colores );  // crea VBO colores
         glBindBuffer( GL_ARRAY_BUFFER, id_vbo_colores );   // activa VBO colores                           
         glBufferData( GL_ARRAY_BUFFER, 3*num_verts*sizeof(float), colores, GL_STATIC_DRAW ); // copia
-        glColorPointer( 3, GL_FLOAT, 0, 0 );    // indica puntero a array de colores
+        glVertexAttribPointer(  ind_atrib_colores, 3, GL_FLOAT, GL_FALSE, 0, posiciones );    // indica puntero a array de colores
         glBindBuffer( GL_ARRAY_BUFFER, 0 );
-        glEnableClientState( GL_COLOR_ARRAY );  // habilita uso de array de colores
+        glEnableVertexAttribArray( ind_atrib_colores ) ;  // habilita uso de array de colores
+        assert( glGetError() == GL_NO_ERROR );
     }
     else
         glBindVertexArray( id_vao );
 
     // dibujar y desactivar el VAO
     glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-    glDrawArrays( GL_POLYGON, 0, num_verts );
+    glDrawArrays( GL_TRIANGLES, 0, num_verts );
     glBindVertexArray( 0 );
 
     assert( glGetError() == GL_NO_ERROR );
@@ -158,7 +286,7 @@ void DibujarTrianguloMD_NoInd( )
 // función que se encarga de visualizar un triángulo relleno en modo diferido,
 // indexado, con 'glDrawElements'
 
-void DibujarTrianguloMD_Ind( ) 
+void DibujarTriangulo_MD_Ind( ) 
 {
      assert( glGetError() == GL_NO_ERROR );
 
@@ -168,9 +296,9 @@ void DibujarTrianguloMD_Ind( )
         num_inds  = 3 ;
 
 
-     // tablas de coordenadas y colores de vértices (coordenadas en 2D, con Z=0) 
+     // tablas de posiciones y colores de vértices (posiciones en 2D, con Z=0) 
     const GLfloat 
-        coordenadas[ num_verts*2 ] = {  -0.8, -0.8,      +0.8, -0.8,     0.0, 0.8      },
+        posiciones[ num_verts*2 ] = {  -0.8, -0.8,      +0.8, -0.8,     0.0, 0.8      },
         colores    [ num_verts*3 ] = {  1.0, 0.0, 0.0,   0.0, 1.0, 0.0,  0.0, 0.0, 1.0 } ;
     const GLuint 
         indices[ num_inds ] = { 0,1,2 };
@@ -182,30 +310,28 @@ void DibujarTrianguloMD_Ind( )
         glGenVertexArrays( 1, &id_vao ); // crear VAO
         glBindVertexArray( id_vao );     // activa VAO
      
-        // desabilitar atributos que no vamos a usar
-        glDisableClientState( GL_NORMAL_ARRAY );   // no usaremos array de normales
-        glDisableClientState( GL_TEXTURE_COORD_ARRAY ); // no usaremos array de coordenadas de textura
-
-        
-        // crear el VBO de coordenadas,  activar, fijar puntero y habilitar 
-        GLenum  id_vbo_coordenadas ;
-        glGenBuffers( 1, &id_vbo_coordenadas );               // crea VBO verts.
-        glBindBuffer( GL_ARRAY_BUFFER, id_vbo_coordenadas );  // activa VBO verts.                            
-        glBufferData( GL_ARRAY_BUFFER, 2*num_verts*sizeof(float), coordenadas, GL_STATIC_DRAW ); // copia
-        glVertexPointer( 2, GL_FLOAT, 0, 0 );  // indica puntero a array de coordenadas
+        // crear el VBO de posiciones,  fijar puntero y lo habilita 
+        GLenum  id_vbo_posiciones ;
+        glGenBuffers( 1, &id_vbo_posiciones );               // crea VBO verts.
+        glBindBuffer( GL_ARRAY_BUFFER, id_vbo_posiciones );  // activa VBO verts.                            
+        glBufferData( GL_ARRAY_BUFFER, 2*num_verts*sizeof(float), posiciones, GL_STATIC_DRAW ); // copia
+        glVertexAttribPointer( ind_atrib_posiciones, 2, GL_FLOAT, GL_FALSE, 0, posiciones );  // indica puntero a array de posiciones
         glBindBuffer( GL_ARRAY_BUFFER, 0 );
-        glEnableClientState( GL_VERTEX_ARRAY ); // habilita uso de array del coordenadas designado con 'glVertexPointer'
+        glEnableVertexAttribArray( ind_atrib_posiciones ); // habilita uso de array de posiciones
+        assert( glGetError() == GL_NO_ERROR );
 
-        // crear el VBO de colores, activar, fijar puntero y habilitar
+        // crear el VBO de colores, fijar puntero y habilitar
         GLenum id_vbo_colores  ;
         glGenBuffers( 1, &id_vbo_colores );  // crea VBO colores
         glBindBuffer( GL_ARRAY_BUFFER, id_vbo_colores );   // activa VBO colores                           
         glBufferData( GL_ARRAY_BUFFER, 3*num_verts*sizeof(float), colores, GL_STATIC_DRAW ); // copia
-        glColorPointer( 3, GL_FLOAT, 0, 0 );    // indica puntero a array de colores
+        glVertexAttribPointer(  ind_atrib_colores, 3, GL_FLOAT, GL_FALSE, 0, posiciones );    // indica puntero a array de colores
         glBindBuffer( GL_ARRAY_BUFFER, 0 );
-        glEnableClientState( GL_COLOR_ARRAY );  // habilita uso de array de colores designado con 'glColorPointer'
+        glEnableVertexAttribArray( ind_atrib_colores ) ;  // habilita uso de array de colores
+        assert( glGetError() == GL_NO_ERROR );
 
-        // crear el VBO de índices, popular VBO (queda activado)
+        // crear el VBO de índices, popular VBO 
+        // (queda activado en el 'target' GL_ELEMENT_ARRAY_BUFFER)
         GLenum id_vbo_indices ;
         glGenBuffers( 1, &id_vbo_indices ); // crea VBO indices 
         glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, id_vbo_indices );// activa VBO de índices y lo deja activado en el target 'GL_ELEMENT_ARRAY_BUFFER', dentro del VBO
@@ -214,92 +340,15 @@ void DibujarTrianguloMD_Ind( )
     else
         glBindVertexArray( id_vao );
 
+    assert( glGetError() == GL_NO_ERROR );
+
     // dibujar y desactivar el VAO
     glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-    glDrawElements( GL_POLYGON, num_inds, GL_UNSIGNED_INT, 0 );
+    glDrawElements( GL_TRIANGLES, num_inds, GL_UNSIGNED_INT, 0 );
     glBindVertexArray( 0 );
-
     assert( glGetError() == GL_NO_ERROR );
 }
-// ---------------------------------------------------------------------------------------------
-// función que se encarga de visualizar un triángulo relleno en modo inmediato,
-// no indexado (con 'glDrawArrays')
 
-void DibujarTrianguloMI_NoInd( ) 
-{
-     assert( glGetError() == GL_NO_ERROR );
-
-    // número de vértices que se van a dibujar
-    constexpr unsigned
-        num_verts = 3 ;
-
-    // coordenadas y colores de los vértices
-    const GLfloat 
-        coordenadas[ num_verts*2 ] = {  -0.6, -0.6,      +0.6, -0.6,     0.0, 0.6      },
-        colores    [ num_verts*3 ] = {  1.0, 1.0, 0.0,   1.0, 0.0, 1.0,  0.0, 1.0, 1.0 } ;
-
-    // activar el VAO por defecto (en memoria de la app), deshabilitar punteros que no se usan (por si acaso)
-    glBindVertexArray( 0 ) ;
-    glDisableClientState( GL_TEXTURE_COORD_ARRAY );
-    glDisableClientState( GL_NORMAL_ARRAY );
-
-    // establecer y habilitar punteros
-    glVertexPointer( 2, GL_FLOAT, 0, coordenadas );  // indica puntero a array de coordenadas
-    glEnableClientState( GL_VERTEX_ARRAY );          // habilita uso del puntero al array de coordenadas
-    glColorPointer( 3, GL_FLOAT, 0, colores );       // indica puntero a array de colores
-    glEnableClientState( GL_COLOR_ARRAY );           // habilita uso del puntero al array de colores
-    
-    // configurar el modo y dibujar
-    glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-    glDrawArrays( GL_POLYGON, 0, num_verts );
-
-    // deshabilitar punteros (queda habilitado el VAO 0)
-    glDisableClientState( GL_VERTEX_ARRAY );
-    glDisableClientState( GL_COLOR_ARRAY );
-
-    assert( glGetError() == GL_NO_ERROR );
-}
-// ---------------------------------------------------------------------------------------------
-// función que se encarga de visualizar un triángulo relleno en modo inmediato,
-// indexado (con 'glDrawElements')
-
-void DibujarTrianguloMI_Ind( ) 
-{
-     assert( glGetError() == GL_NO_ERROR );
-
-    // número de vértices e índices que se van a dibujar
-    constexpr unsigned
-        num_verts = 3 ,
-        num_inds  = 3 ;
-
-    // coordenadas y colores de los vértices
-    const GLfloat 
-        coordenadas[ num_verts*2 ] = {  -0.6, -0.6,      +0.6, -0.6,     0.0, 0.6      },
-        colores    [ num_verts*3 ] = {  1.0, 1.0, 0.0,   1.0, 0.0, 1.0,  0.0, 1.0, 1.0 } ;
-    const GLuint 
-        indices[ num_inds ] = { 0,1,2 };
-
-    // activar el VAO por defecto (en memoria de la app), deshabilitar punteros que no se usan (por si acaso)
-    glBindVertexArray( 0 ) ;
-    glDisableClientState( GL_TEXTURE_COORD_ARRAY );
-    glDisableClientState( GL_NORMAL_ARRAY );
-
-    // establecer y habilitar punteros
-    glVertexPointer( 2, GL_FLOAT, 0, coordenadas );  // indica puntero a array de coordenadas
-    glEnableClientState( GL_VERTEX_ARRAY );          // habilita uso del puntero al array de coordenadas
-    glColorPointer( 3, GL_FLOAT, 0, colores );       // indica puntero a array de colores
-    glEnableClientState( GL_COLOR_ARRAY );           // habilita uso del puntero al array de colores
-    
-    // configurar el modo y dibujar, al dibujar especificar donde está el array de índices
-    glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-    glDrawElements( GL_POLYGON, num_inds, GL_UNSIGNED_INT, indices );
-
-    // deshabilitar punteros (queda habilitado el VAO 0)
-    glDisableClientState( GL_VERTEX_ARRAY );
-    glDisableClientState( GL_COLOR_ARRAY );
-
-    assert( glGetError() == GL_NO_ERROR );
-}
 
 // ---------------------------------------------------------------------------------------------
 // función que se encarga de visualizar el contenido en la ventana
@@ -314,13 +363,13 @@ void VisualizarFrame( )
     // establece la zona visible (toda la ventana)
     glViewport( 0, 0, ancho_actual, alto_actual ); 
 
-    // fija la matriz de transformación de coordenadas de los shaders ('u_modelview'), 
+    // fija la matriz de transformación de posiciones de los shaders ('u_modelview'), 
     // (la hace igual a la matriz identidad)
-    glUniformMatrix4fv( loc_modelview, 1, GL_TRUE, mat_ident );
+    glUniformMatrix4fv( loc_mat_modelview, 1, GL_TRUE, mat_ident );
 
     // fija la matriz de proyeccion 'modelview' de los shaders ('u_proyeccion')
     // (la hace igual a la matriz identidad)
-    glUniformMatrix4fv( loc_proyeccion, 1, GL_TRUE, mat_ident );
+    glUniformMatrix4fv( loc_mat_proyeccion, 1, GL_TRUE, mat_ident );
     
     // limpiar la ventana
     glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT ); 
@@ -330,9 +379,9 @@ void VisualizarFrame( )
 
     // Dibujar un triángulo en modo diferido 
     //DibujarTrianguloMD_NoInd();
-    DibujarTrianguloMD_Ind();
+    DibujarTriangulo_MD_Ind();
 
-    // Cambiar la matriz de transformación de coordenadas (matriz 'u_modelview')
+    // Cambiar la matriz de transformación de posiciones (matriz 'u_modelview')
     constexpr float incremento_z = -0.1 ;
     const GLfloat mat_despl[] =     // matriz 4x4 desplazamiento
     {   1.0, 0.0, 0.0, 0.2,         // (0,2 en X y en Y, -0.1 en Z (más cerca))
@@ -340,11 +389,11 @@ void VisualizarFrame( )
         0.0, 0.0, 1.0, incremento_z, 
         0.0, 0.0, 0.0, 1.0, 
     } ;
-    glUniformMatrix4fv( loc_modelview, 1, GL_TRUE, mat_despl );
+    glUniformMatrix4fv( loc_mat_modelview, 1, GL_TRUE, mat_despl );
 
     // dibujar triángulo (desplazado) en modo inmediato.
-    //DibujarTrianguloMI_NoInd(); // no indexado 
-    DibujarTrianguloMI_Ind();     // indexado 
+    //DibujarTriangulo_MI_NoInd(); // no indexado 
+    DibujarTriangulo_MD_NoInd();     // indexado 
 
     // comprobar y limpiar variable interna de error
     assert( glGetError() == GL_NO_ERROR );
@@ -419,6 +468,13 @@ void InicializaGLFW( int argc, char * argv[] )
         cout << "Imposible inicializar GLFW. Termino." << endl ;
         exit(1) ; 
     }
+
+    // especificar versión de OpenGL y parámetros de compatibilidad que se querrán
+   // (pedimos opengl 330, tipo "core" (sin compatibilidad con versiones anteriores)
+   glfwWindowHint( GLFW_CONTEXT_VERSION_MAJOR, 3 );
+   glfwWindowHint( GLFW_CONTEXT_VERSION_MINOR, 3 );
+   glfwWindowHint( GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE );
+   glfwWindowHint( GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE );
     
     // especificar que función se llamará ante un error de GLFW
     glfwSetErrorCallback( ErrorGLFW );
@@ -460,8 +516,9 @@ void InicializaGLEW()
 }
 // ---------------------------------------------------------------------------------------------
 // función que compila el vertex y el fragment shader
+// (deja activado el objeto programa)
 
-void CompilarShaders( ) 
+void CompilarEnlazarShaders( ) 
 { 
     assert( glGetError() == GL_NO_ERROR );
     using namespace std ;
@@ -484,7 +541,8 @@ void CompilarShaders( )
     GLint estado_vs ; 
     glGetShaderiv( id_vs, GL_COMPILE_STATUS, &estado_vs );
     if ( estado_vs != GL_TRUE )
-    {   cout << "Error al compilar el vertex shader. Aborto." << endl ;
+    {   
+        cout << "Error al compilar el vertex shader. Aborto." << endl ;
         glGetShaderInfoLog( id_vs, long_buffer, &long_informe, buffer );
         cout << buffer << endl ;
         exit(1);
@@ -499,7 +557,8 @@ void CompilarShaders( )
     GLint estado_fs ; 
     glGetShaderiv( id_fs, GL_COMPILE_STATUS, &estado_fs );
     if ( estado_fs != GL_TRUE )
-    {   cout << "Error al compilar el fragment shader. Aborto." << endl ;
+    {   
+        cout << "Error al compilar el fragment shader. Aborto." << endl ;
         glGetShaderInfoLog( id_fs, long_buffer, &long_informe, buffer );
         cout << buffer << endl ;
         exit(1);
@@ -515,7 +574,8 @@ void CompilarShaders( )
     GLint estado_prog ;
     glGetProgramiv( id_prog, GL_LINK_STATUS, &estado_prog );
     if ( estado_prog != GL_TRUE )
-    {   cout << "Error al enlazar el programa. Aborto." << endl ;
+    {   
+        cout << "Error al enlazar el programa. Aborto." << endl ;
         glGetProgramInfoLog( id_prog, long_buffer, &long_informe, buffer );
         cout << buffer << endl ;
         exit(1);
@@ -523,24 +583,22 @@ void CompilarShaders( )
 
     assert( glGetError() == GL_NO_ERROR );
 
-     
-
     // activar el programa
     glUseProgram( id_prog );
 
     // leer el identificador ("location") del parámetro uniform "u_modelview"
     // poner esa matriz con un valor igual a la matriz identidad.
-    loc_modelview = glGetUniformLocation( id_prog, "u_modelview" );
-    if ( loc_modelview == -1 )
-    {   cout << "Error: no encuentro variable uniform 'u_modelview'" << endl ;
+    loc_mat_modelview = glGetUniformLocation( id_prog, "u_mat_modelview" );
+    if ( loc_mat_modelview == -1 )
+    {   cout << "Error: no encuentro variable uniform 'u_mat_modelview'" << endl ;
         exit(1);
     }
 
     // leer el identificador ("location") del parámetro uniform "u_proyeccion"
     // poner esa matriz con un valor igual a la matriz identidad.
-    loc_proyeccion = glGetUniformLocation( id_prog, "u_proyeccion" );
-    if ( loc_modelview == -1 )
-    {   cout << "Error: no encuentro variable uniform 'u_proyeccion'" << endl ;
+    loc_mat_proyeccion = glGetUniformLocation( id_prog, "u_mat_proyeccion" );
+    if ( loc_mat_modelview == -1 )
+    {   cout << "Error: no encuentro variable uniform 'u_mat_proyeccion'" << endl ;
         exit(1);
     }
     
@@ -561,10 +619,12 @@ void InicializaOpenGL()
          << "    version de GLSL   : " << glGetString(GL_SHADING_LANGUAGE_VERSION) << endl ;
 
     InicializaGLEW(); // Fijar puntero a funciones de OpenGL versión 2.0 y posteriores
-    CompilarShaders();
-
-    glLineWidth( 1.7 );
+    CompilarEnlazarShaders();
+    assert( glGetError() == GL_NO_ERROR );
+    glLineWidth( 1.0 );
+    assert( glGetError() == GL_NO_ERROR );
     glClearColor( 1.0, 1.0, 1.0, 0.0 ); // color para 'glClear' (blanco, 100% opaco)
+    assert( glGetError() == GL_NO_ERROR );
 }
 // ---------------------------------------------------------------------------------------------
 
@@ -584,7 +644,7 @@ void BucleEventosGLFW()
 int main( int argc, char *argv[] )
 {
     using namespace std ;
-    cout << "Programa mínimo de OpenGL 2.1" << endl ;
+    cout << "Programa mínimo de OpenGL 3.3 o superior" << endl ;
 
     InicializaGLFW( argc, argv ); // Crea una ventana, fija funciones gestoras de eventos
     InicializaOpenGL() ;          // Compila vertex y fragment shaders. Enlaza y activa programa. Inicializa GLEW.
