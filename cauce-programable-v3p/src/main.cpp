@@ -45,7 +45,8 @@ GLint
     loc_mat_modelview,             // localizador o identificador (location) de la matriz 'u_modelview'  en los shaders
     loc_mat_proyeccion ;           // localizador o identificador (location) de la matriz 'u_proyeccion' en los shaders
 GLenum 
-    id_vao = 0 ;                   // identificador de VAO (vertex array object)
+    id_vao_ind = 0 ,                   // identificador de VAO (vertex array object)
+    id_vao_no_ind = 0 ;
 
 
 constexpr GLfloat mat_ident[] =    // matriz 4x4 identidad (para fijar valor inicial de las matrices)
@@ -177,6 +178,7 @@ void DibujarTriangulo_MI_Ind( )
 
      // activar el VAO por defecto (es el que se usa siempre para modo inmediato)
     glBindVertexArray( 0 ) ;
+    glBindBuffer( GL_ARRAY_BUFFER, 0 );
    
     // fijar habilitar puntero a array de posiciones
     glVertexAttribPointer( ind_atrib_posiciones, 2, GL_FLOAT, GL_FALSE, 0, posiciones );  
@@ -186,7 +188,9 @@ void DibujarTriangulo_MI_Ind( )
             using namespace std ;
             if ( err == GL_INVALID_OPERATION )
                 cout << "invalid operation en glVertexAttribPointer en M.I." << endl ;
-            else 
+            else if ( err == GL_INVALID_ENUM )
+                cout << "invalid enum en glVertexAttribPointer en M.I." << endl ;
+            else
                 cout << "Otro error..." << endl ;
             exit(1);
         }
@@ -243,11 +247,11 @@ void DibujarTriangulo_MD_NoInd( )
         colores   [ num_verts*3 ] = {  1.0, 0.0, 0.0,   0.0, 1.0, 0.0,  0.0, 0.0, 1.0 } ;
 
     // la primera vez, crear e inicializar el VAO
-    if ( id_vao == 0 )
+    if ( id_vao_no_ind == 0 )
     {
         // crear y activar el VAO
-        glGenVertexArrays( 1, &id_vao ); // crear VAO
-        glBindVertexArray( id_vao );     // activa VAO
+        glGenVertexArrays( 1, &id_vao_no_ind ); // crear VAO
+        glBindVertexArray( id_vao_no_ind );     // activa VAO
         assert( glGetError() == GL_NO_ERROR );
 
         // crear el VBO de posiciones,  fijar puntero y lo habilita 
@@ -255,9 +259,10 @@ void DibujarTriangulo_MD_NoInd( )
         glGenBuffers( 1, &id_vbo_posiciones );               // crea VBO verts.
         glBindBuffer( GL_ARRAY_BUFFER, id_vbo_posiciones );  // activa VBO verts.                            
         glBufferData( GL_ARRAY_BUFFER, 2*num_verts*sizeof(float), posiciones, GL_STATIC_DRAW ); // copia
-        glVertexAttribPointer( ind_atrib_posiciones, 2, GL_FLOAT, GL_FALSE, 0, posiciones );  // indica puntero a array de posiciones
-        glBindBuffer( GL_ARRAY_BUFFER, 0 );
+        glVertexAttribPointer( ind_atrib_posiciones, 2, GL_FLOAT, GL_FALSE, 0, 0 );  // indica puntero a array de posiciones
         glEnableVertexAttribArray( ind_atrib_posiciones ); // habilita uso de array de posiciones
+        glBindBuffer( GL_ARRAY_BUFFER, 0 );
+        
         assert( glGetError() == GL_NO_ERROR );
 
         // crear el VBO de colores, fijar puntero y habilitar
@@ -265,13 +270,13 @@ void DibujarTriangulo_MD_NoInd( )
         glGenBuffers( 1, &id_vbo_colores );  // crea VBO colores
         glBindBuffer( GL_ARRAY_BUFFER, id_vbo_colores );   // activa VBO colores                           
         glBufferData( GL_ARRAY_BUFFER, 3*num_verts*sizeof(float), colores, GL_STATIC_DRAW ); // copia
-        glVertexAttribPointer(  ind_atrib_colores, 3, GL_FLOAT, GL_FALSE, 0, posiciones );    // indica puntero a array de colores
-        glBindBuffer( GL_ARRAY_BUFFER, 0 );
+        glVertexAttribPointer(  ind_atrib_colores, 3, GL_FLOAT, GL_FALSE, 0, 0 );    // indica puntero a array de colores
         glEnableVertexAttribArray( ind_atrib_colores ) ;  // habilita uso de array de colores
+        glBindBuffer( GL_ARRAY_BUFFER, 0 );
         assert( glGetError() == GL_NO_ERROR );
     }
     else
-        glBindVertexArray( id_vao );
+        glBindVertexArray( id_vao_no_ind );
 
     // dibujar y desactivar el VAO
     glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
@@ -304,18 +309,18 @@ void DibujarTriangulo_MD_Ind( )
         indices[ num_inds ] = { 0,1,2 };
 
     // la primera vez, crear e inicializar el VAO
-    if ( id_vao == 0 )
+    if ( id_vao_ind == 0 )
     {
         // crear y activar el VAO
-        glGenVertexArrays( 1, &id_vao ); // crear VAO
-        glBindVertexArray( id_vao );     // activa VAO
+        glGenVertexArrays( 1, &id_vao_ind ); // crear VAO
+        glBindVertexArray( id_vao_ind );     // activa VAO
      
         // crear el VBO de posiciones,  fijar puntero y lo habilita 
         GLenum  id_vbo_posiciones ;
         glGenBuffers( 1, &id_vbo_posiciones );               // crea VBO verts.
         glBindBuffer( GL_ARRAY_BUFFER, id_vbo_posiciones );  // activa VBO verts.                            
         glBufferData( GL_ARRAY_BUFFER, 2*num_verts*sizeof(float), posiciones, GL_STATIC_DRAW ); // copia
-        glVertexAttribPointer( ind_atrib_posiciones, 2, GL_FLOAT, GL_FALSE, 0, posiciones );  // indica puntero a array de posiciones
+        glVertexAttribPointer( ind_atrib_posiciones, 2, GL_FLOAT, GL_FALSE, 0, 0 );  // indica puntero a array de posiciones
         glBindBuffer( GL_ARRAY_BUFFER, 0 );
         glEnableVertexAttribArray( ind_atrib_posiciones ); // habilita uso de array de posiciones
         assert( glGetError() == GL_NO_ERROR );
@@ -325,7 +330,7 @@ void DibujarTriangulo_MD_Ind( )
         glGenBuffers( 1, &id_vbo_colores );  // crea VBO colores
         glBindBuffer( GL_ARRAY_BUFFER, id_vbo_colores );   // activa VBO colores                           
         glBufferData( GL_ARRAY_BUFFER, 3*num_verts*sizeof(float), colores, GL_STATIC_DRAW ); // copia
-        glVertexAttribPointer(  ind_atrib_colores, 3, GL_FLOAT, GL_FALSE, 0, posiciones );    // indica puntero a array de colores
+        glVertexAttribPointer(  ind_atrib_colores, 3, GL_FLOAT, GL_FALSE, 0, 0 );    // indica puntero a array de colores
         glBindBuffer( GL_ARRAY_BUFFER, 0 );
         glEnableVertexAttribArray( ind_atrib_colores ) ;  // habilita uso de array de colores
         assert( glGetError() == GL_NO_ERROR );
@@ -338,13 +343,15 @@ void DibujarTriangulo_MD_Ind( )
         glBufferData( GL_ELEMENT_ARRAY_BUFFER, num_inds*sizeof(unsigned), indices, GL_STATIC_DRAW ); // copia indices desde  RAM hacia GPU        
     }
     else
-        glBindVertexArray( id_vao );
+        glBindVertexArray( id_vao_ind );
 
     assert( glGetError() == GL_NO_ERROR );
 
     // dibujar y desactivar el VAO
     glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+    assert( glGetError() == GL_NO_ERROR );
     glDrawElements( GL_TRIANGLES, num_inds, GL_UNSIGNED_INT, 0 );
+    assert( glGetError() == GL_NO_ERROR );
     glBindVertexArray( 0 );
     assert( glGetError() == GL_NO_ERROR );
 }
@@ -378,8 +385,7 @@ void VisualizarFrame( )
     glEnable( GL_DEPTH_TEST );
 
     // Dibujar un triángulo en modo diferido 
-    //DibujarTrianguloMD_NoInd();
-    DibujarTriangulo_MD_Ind();
+    DibujarTriangulo_MD_NoInd();
 
     // Cambiar la matriz de transformación de posiciones (matriz 'u_modelview')
     constexpr float incremento_z = -0.1 ;
@@ -392,8 +398,7 @@ void VisualizarFrame( )
     glUniformMatrix4fv( loc_mat_modelview, 1, GL_TRUE, mat_despl );
 
     // dibujar triángulo (desplazado) en modo inmediato.
-    //DibujarTriangulo_MI_NoInd(); // no indexado 
-    DibujarTriangulo_MD_NoInd();     // indexado 
+    DibujarTriangulo_MD_Ind();     // indexado 
 
     // comprobar y limpiar variable interna de error
     assert( glGetError() == GL_NO_ERROR );
