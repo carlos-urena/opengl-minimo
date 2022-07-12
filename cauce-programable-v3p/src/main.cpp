@@ -73,6 +73,7 @@ const char * const fuente_vs = R"glsl(
 
     uniform mat4 u_mat_modelview;  // variable uniform: matriz de transformación de posiciones
     uniform mat4 u_mat_proyeccion; // variable uniform: matriz de proyección
+    uniform bool u_usar_color_plano; // 1 --> usar color plano, 0 -> usar color interpolado
 
     // Atributos de vértice (variables de entrada distintas para cada vértice)
     // (las posiciones de posición siempre deben estar en la 'location' 0)
@@ -83,13 +84,15 @@ const char * const fuente_vs = R"glsl(
     // Variables 'varying' (variables de salida, se calculan aquí para cada vértice y se 
     // entregan interpoladas al fragment shader) - adicionales a 'gl_Position'
     
-    out vec3 var_color ; // color RGB del vértice (el mismo que proporciona la aplic.)
+    out      vec3 var_color       ; // color RGB del vértice (el mismo que proporciona la aplic.)
+    flat out vec3 var_color_plano ; // color RGB del 'provoking vertex'
 
     // función principal que se ejecuta una vez por vértice
     void main() 
     {
         // copiamos color recibido en el color de salida, tal cual
-        var_color = atrib_color ;
+        var_color       = atrib_color ;
+        var_color_plano = atrib_color ;
 
         // calcular las posiciones del vértice en posiciones de mundo y escribimos 'gl_Position'
         // (se calcula multiplicando las cordenadas por la matrices 'modelview' y 'projection')
@@ -103,11 +106,16 @@ const char * const fuente_vs = R"glsl(
 
 const char * const fuente_fs = R"glsl(
     #version 330 core
+
+    // Parámetros uniform (variables de entrada iguales para todos los pixels en cada primitiva)
+
+    uniform bool u_usar_color_plano; // 1 --> usar color plano, 0 -> usar color interpolado
     
     // datos de entrada ('in'), valores interpolados, a partir de las variables 
     // 'varying' calculadas como salida del vertex shader (se deben corresponder en nombre y tipo):
 
-    in vec3 var_color ; // color interpolado en el pixel.
+    in      vec3 var_color ;       // color interpolado en el pixel.
+    flat in vec3 var_color_plano ; // color (plano) producido por el 'provoking vertex'
 
     // dato de salida (color del pixel)
     layout( location = 0 ) out vec4 out_color_fragmento ; // color que se calcula como resultado final de este shader en 'main'
@@ -136,21 +144,29 @@ const char * const fuente_fs = R"glsl(
 GLenum CrearVBOAtrib( GLuint ind_atrib, GLint num_vals_vert, GLenum tipo_vals, 
                       GLuint num_verts, const void * datos )
 {
+    // comprobar errores en el estado de OpenGL o en los parámetros
     assert( glGetError() == GL_NO_ERROR );
     assert( 0 <= ind_atrib && ind_atrib <= num_atribs );
     assert( tipo_vals == GL_FLOAT || tipo_vals == GL_DOUBLE );
 
-    const GLint      bytes_x_valor   = (tipo_vals == GL_FLOAT) ? sizeof(float) : sizeof(double) ; // bytes por valor
-    const GLsizeiptr tam_total_bytes = num_verts*num_vals_vert*bytes_x_valor ; // tamaño total de la tabla en bytes
+    // calcular bytes por valor y tamaño total en bytes
+    const GLint      bytes_x_valor   = (tipo_vals == GL_FLOAT) ? sizeof(float) : sizeof(double) ; 
+    const GLsizeiptr tam_total_bytes = num_verts*num_vals_vert*bytes_x_valor ; 
 
+    // crear y activar el VBO
     GLenum id_vbo = 0 ;
     glGenBuffers( 1, &id_vbo );               // crea VBO verts.
     glBindBuffer( GL_ARRAY_BUFFER, id_vbo );  // activa VBO verts.                            
-    glBufferData( GL_ARRAY_BUFFER, tam_total_bytes, datos, GL_STATIC_DRAW ); // copia App --> GPU
-    glVertexAttribPointer( ind_atrib, num_vals_vert, GL_FLOAT, GL_FALSE, 0, 0 );  // fija puntero
-    glBindBuffer( GL_ARRAY_BUFFER, 0 );
-    glEnableVertexAttribArray( ind_atrib ); // habilita uso de array de posiciones
 
+    // copiar datos desde la memoria de la aplicación hacia la GPU
+    glBufferData( GL_ARRAY_BUFFER, tam_total_bytes, datos, GL_STATIC_DRAW ); 
+
+    // decir donde esta la tabla en el VBO y habilitar uso de la tabla
+    glVertexAttribPointer( ind_atrib, num_vals_vert, tipo_vals, GL_FALSE, 0, 0 );  
+    glEnableVertexAttribArray( ind_atrib ); 
+
+    // desactivar el VBO, comprobar errores, devolver el identificador
+    glBindBuffer( GL_ARRAY_BUFFER, 0 );
     assert( glGetError() == GL_NO_ERROR );
     return id_vbo ;
 }
