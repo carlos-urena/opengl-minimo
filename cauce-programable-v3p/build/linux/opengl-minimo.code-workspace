@@ -1,6 +1,6 @@
 {
   "folders": 
-  [ { "name": "BUILD (macOS)",
+  [ { "name": "BUILD (linux)",
       "path": "."
     },
     { "name": "FUENTES",
