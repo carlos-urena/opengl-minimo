@@ -1,12 +1,13 @@
 .SUFFIXES:
 .PHONY: x, clean
 
+ejecutable:=main_macos_exe
 
-x: bin/main_exe
-	./bin/main_exe
+x: $(ejecutable)
+	./$<
 
-bin/main_exe: ../../src/main.cpp
-	clang++  -std=c++11 -Wall -Wfatal-errors -Wno-deprecated-declarations -lglfw -framework OpenGL -o bin/main_exe  ../../src/main.cpp
+$(ejecutable): ../../src/main.cpp
+	clang++  -std=c++11 -Wall -Wfatal-errors -Wno-deprecated-declarations -lglfw -framework OpenGL -o $(ejecutable)  ../../src/main.cpp
 
 clean:
-	rm -rf bin/*_exe
+	rm -rf *_exe

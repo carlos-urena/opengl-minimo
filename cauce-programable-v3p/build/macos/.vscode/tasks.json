@@ -22,7 +22,7 @@
     {
       "label"   : "Compilar si es necesario",
       "type"    : "shell",
-      "command" : "make ./bin/main_exe",
+      "command" : "make main_macos_exe",
       "group"   : 
       {
         "kind"      : "build",
@@ -36,9 +36,9 @@
       }
     },
     {
-      "label"   : "Limpiar y Compilar",
+      "label"   : "Limpiar y Recompilar",
       "type"    : "shell",
-      "command" : "make clean ; make ./bin/main_exe",
+      "command" : "make clean ; make main_macos_exe",
       "group"   : 
       {
         "kind"      : "build",
@@ -54,7 +54,7 @@
     {
       "label"   : "Ejecutar",
       "type"    : "shell",
-      "command" : "./bin/main_exe",
+      "command" : "./main_macos_exe",
       "group"   : 
       { "kind"      : "test",
         "isDefault" : true
