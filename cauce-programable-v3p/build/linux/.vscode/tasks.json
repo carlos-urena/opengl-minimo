@@ -13,16 +13,15 @@
         "isDefault" : true
       },
       "problemMatcher" : "$gcc",
-      "presentation" : 
+      "presentation"   : 
       {
-        "reveal": "always",
-        "panel": "new"
+        "reveal": "always"
       }
     },
     {
       "label"   : "Compilar si es necesario",
       "type"    : "shell",
-      "command" : "make ./bin/main_exe",
+      "command" : "make ./main_linux_exe",
       "group"   : 
       {
         "kind"      : "build",
@@ -31,14 +30,13 @@
       "problemMatcher" : "$gcc",
       "presentation" : 
       {
-        "reveal" : "always",
-        "panel"  : "new"
+        "reveal" : "always"
       }
     },
     {
       "label"   : "Limpiar y Compilar",
       "type"    : "shell",
-      "command" : "make clean ; make ./bin/main_exe",
+      "command" : "make clean ; make ./main_linux_exe",
       "group"   : 
       {
         "kind"      : "build",
@@ -47,21 +45,19 @@
       "problemMatcher" : "$gcc",
       "presentation" : 
       {
-        "reveal" : "always",
-        "panel"  : "new"
+        "reveal" : "always"
       }
     },
     {
       "label"   : "Ejecutar",
       "type"    : "shell",
-      "command" : "./bin/main_exe",
+      "command" : "./main_linux_exe",
       "group"   : 
       { "kind"      : "test",
         "isDefault" : true
       },
       "presentation": 
-      { "reveal" : "always",
-        "panel"  : "new"
+      { "reveal" : "always"
       }
     },
     {
@@ -73,8 +69,7 @@
         "isDefault" : false
       },
       "presentation" : 
-      { "reveal": "always",
-        "panel": "new"
+      { "reveal": "always"
       }
     }
   ]    
